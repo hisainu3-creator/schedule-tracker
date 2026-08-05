@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>残りタスク&時間トラッカー</title>
+<style>
+  /* ============================================================
+     見た目のルール:とにかく文字を大きく、色でしか判断しなくていい
+     ようにする(緑=余裕、黄=注意、赤=やばい)。ボタンも最小限にして
+     「バカでも理解できる」を優先する。
+     ============================================================ */
+  :root{
+    --bg:#0f172a;
+    --card:#1e293b;
+    --text:#f8fafc;
+    --sub:#94a3b8;
+    --safe:#22c55e;
+    --warn:#f59e0b;
+    --danger:#ef4444;
+  }
+  *{ box-sizing:border-box; }
+  body{
+    margin:0;
+    font-family:-apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:24px 16px 60px;
+  }
+  h1{ font-size:16px; color:var(--sub); font-weight:500; margin:4px 0 20px; }
+
+  /* 残りタスク数・残り時間を表示する巨大カード共通スタイル */
+  .big-card{
+    width:100%;
+    max-width:420px;
+    background:var(--card);
+    border-radius:24px;
+    padding:26px 20px;
+    text-align:center;
+    margin-bottom:16px;
+    transition:background .4s ease, box-shadow .4s ease;
+  }
+  .big-number{
+    font-size:60px;
+    font-weight:800;
+    line-height:1;
+    letter-spacing:-1px;
+    font-variant-numeric:tabular-nums; /* 数字の桁がガタガタ動かないようにする */
+  }
+  .big-label{
+    font-size:13px;
+    color:var(--sub);
+    margin-top:8px;
+  }
+  /* 残り時間カードは緑/黄/赤で枠が光るようにして、色だけで緊急度がわかるようにする */
+  #timeCard.safe{ box-shadow:0 0 0 3px var(--safe) inset; }
+  #timeCard.warn{ box-shadow:0 0 0 3px var(--warn) inset; }
+  #timeCard.danger{ box-shadow:0 0 0 3px var(--danger) inset; animation:pulse 1s infinite; }
+  @keyframes pulse{
+    0%,100%{ transform:scale(1); }
+    50%{ transform:scale(1.02); }
+  }
+
+  /* 終業時刻・通知間隔などの設定エリア */
+  .settings{
+    width:100%;
+    max-width:420px;
+    background:var(--card);
+    border-radius:16px;
+    padding:14px 16px;
+    margin-bottom:16px;
+  }
+  .settings label{ display:block; font-size:12px; color:var(--sub); margin-bottom:4px; }
+  .settings-row{ display:flex; gap:10px; }
+  .settings-row > div{ flex:1; }
+  input[type="time"], input[type="number"]{
+    width:100%;
+    padding:10px;
+    border-radius:8px;
+    border:1px solid #334155;
+    background:#0f172a;
+    color:var(--text);
+    font-size:16px; /* 16px未満だとiPhoneが勝手にズームするので必ず16px以上 */
+  }
+
+  /* タスク追加フォーム */
+  .add-row{
+    width:100%;
+    max-width:420px;
+    display:flex;
+    gap:8px;
+    margin-bottom:12px;
+  }
+  #taskInput{
+    flex:1;
+    padding:14px;
+    border-radius:12px;
+    border:1px solid #334155;
+    background:var(--card);
+    color:var(--text);
+    font-size:16px;
+  }
+  #addBtn{
+    padding:0 22px;
+    border:none;
+    border-radius:12px;
+    background:#3b82f6;
+    color:#fff;
+    font-size:16px;
+    font-weight:700;
+  }
+
+  /* タスク一覧 */
+  ul#taskList{
+    list-style:none;
+    padding:0;
+    margin:0;
+    width:100%;
+    max-width:420px;
+  }
+  ul#taskList li{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    background:var(--card);
+    padding:14px;
+    border-radius:12px;
+    margin-bottom:8px;
+    font-size:16px;
+  }
+  ul#taskList li.done{ opacity:.4; text-decoration:line-through; }
+  ul#taskList li input[type="checkbox"]{ width:22px; height:22px; flex-shrink:0; }
+  ul#taskList li span{ flex:1; word-break:break-word; }
+  ul#taskList li button{
+    background:none;
+    border:none;
+    color:var(--sub);
+    font-size:20px;
+    padding:4px 8px;
+  }
+
+  #notifyBtn{
+    width:100%;
+    max-width:420px;
+    padding:14px;
+    border-radius:12px;
+    border:1px dashed #475569;
+    background:transparent;
+    color:var(--sub);
+    font-size:14px;
+    margin-top:8px;
+  }
+  .hint{
+    max-width:420px;
+    font-size:12px;
+    color:var(--sub);
+    text-align:center;
+    margin-top:14px;
+    line-height:1.6;
+  }
+</style>
+</head>
+<body>
+
+<h1>今日の残りタスク&時間</h1>
+
+<!-- 残りタスク数の巨大表示。ここを見るだけで「あと何個やればいいか」が一瞬でわかる -->
+<div class="big-card" id="taskCard">
+  <div class="big-number" id="remainingTasksNum">0</div>
+  <div class="big-label">残りタスク数</div>
+</div>
+
+<!-- 残り時間の巨大表示。カード枠の色が緑→黄→赤に変わって緊急度を伝える -->
+<div class="big-card" id="timeCard">
+  <div class="big-number" id="remainingTimeNum">--:--:--</div>
+  <div class="big-label">終業までの残り時間</div>
+</div>
+
+<!-- 終業時刻・通知間隔の設定。ここで「何時までに終わらせたいか」を決める -->
+<div class="settings">
+  <div class="settings-row">
+    <div>
+      <label>終業時刻</label>
+      <input type="time" id="endTimeInput">
+    </div>
+    <div>
+      <label>通知間隔(分)</label>
+      <input type="number" id="notifyIntervalInput" min="1" value="15">
+    </div>
+  </div>
+</div>
+
+<!-- タスクの追加フォーム -->
+<div class="add-row">
+  <input type="text" id="taskInput" placeholder="タスクを入力してEnter">
+  <button id="addBtn">追加</button>
+</div>
+
+<ul id="taskList"></ul>
+
+<button id="notifyBtn">通知をオンにする(スマホでも主張してくる)</button>
+
+<p class="hint">
+  スマホでアプリっぽく使うには:<br>
+  iPhone → Safariの共有ボタン →「ホーム画面に追加」<br>
+  Android → Chromeのメニュー →「ホーム画面に追加/インストール」<br>
+  通知はこの画面(タブ)を開いている間に鳴ります。
+</p>
+
+<script>
+/* =====================================================================
+   このスクリプトは4つのパートに分かれています。
+   1. データの保存・読み込み  … localStorageでタスクと設定を記憶する
+   2. 画面の描画              … タスク一覧・残りタスク数を表示し直す
+   3. タスクの追加/完了/削除  … ユーザー操作に対応する
+   4. 残り時間の計算と通知     … 毎秒残り時間を計算し、一定間隔で
+                                「音・振動・通知」でしつこく知らせる
+   ===================================================================== */
+
+/* ---------- 1. データの保存・読み込み ---------- */
+// タスクは配列で管理: [{text:"資料作成", done:false}, ...]
+// ページを開いた瞬間にlocalStorageから読み込み、変更のたびに保存し直す
+// → これでタブを閉じても、次に開いたときにタスクが消えない
+let tasks = JSON.parse(localStorage.getItem('scheduleTasks') || '[]');
+
+// 終業時刻(文字列 "HH:MM")。初回は18:00をデフォルトにする
+let endTime = localStorage.getItem('scheduleEndTime') || '18:00';
+
+// 通知間隔(分)。初回は15分ごと
+let notifyInterval = Number(localStorage.getItem('scheduleNotifyInterval') || 15);
+
+function saveTasks(){
+  localStorage.setItem('scheduleTasks', JSON.stringify(tasks));
+}
+function saveSettings(){
+  localStorage.setItem('scheduleEndTime', endTime);
+  localStorage.setItem('scheduleNotifyInterval', String(notifyInterval));
+}
+
+/* ---------- 画面要素をまとめて取得 ---------- */
+const remainingTasksNum   = document.getElementById('remainingTasksNum');
+const remainingTimeNum    = document.getElementById('remainingTimeNum');
+const timeCard            = document.getElementById('timeCard');
+const taskCard            = document.getElementById('taskCard');
+const taskListEl          = document.getElementById('taskList');
+const taskInput           = document.getElementById('taskInput');
+const addBtn               = document.getElementById('addBtn');
+const endTimeInput        = document.getElementById('endTimeInput');
+const notifyIntervalInput = document.getElementById('notifyIntervalInput');
+const notifyBtn           = document.getElementById('notifyBtn');
+
+// 設定フォームに、保存されていた値を反映しておく
+endTimeInput.value = endTime;
+notifyIntervalInput.value = notifyInterval;
+
+/* ---------- 2. タスク一覧の描画 ---------- */
+// tasks配列の中身をもとに、<ul>の中身を毎回作り直すシンプルな方式
+function renderTasks(){
+  taskListEl.innerHTML = '';
+
+  tasks.forEach((task, index) => {
+    const li = document.createElement('li');
+    if (task.done) li.classList.add('done');
+
+    // 完了/未完了を切り替えるチェックボックス
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = task.done;
+    checkbox.addEventListener('change', () => {
+      tasks[index].done = checkbox.checked;
+      saveTasks();
+      renderTasks(); // 残りタスク数の再計算も含めて描画し直す
+    });
+
+    // タスク名のテキスト
+    const span = document.createElement('span');
+    span.textContent = task.text;
+
+    // タスクを削除するボタン
+    const delBtn = document.createElement('button');
+    delBtn.textContent = '✕';
+    delBtn.setAttribute('aria-label', 'タスクを削除');
+    delBtn.addEventListener('click', () => {
+      tasks.splice(index, 1);
+      saveTasks();
+      renderTasks();
+    });
+
+    li.append(checkbox, span, delBtn);
+    taskListEl.appendChild(li);
+  });
+
+  // 未完了(done === false)のタスクだけ数えて、大きな数字として表示
+  const remaining = tasks.filter(t => !t.done).length;
+  remainingTasksNum.textContent = remaining;
+
+  // 残り0件なら達成感が出るように背景を緑寄りにする
+  taskCard.style.background = remaining === 0 ? '#14532d' : '#1e293b';
+}
+
+/* ---------- 3. タスクの追加・設定変更のイベント ---------- */
+function addTask(){
+  const text = taskInput.value.trim();
+  if (!text) return; // 空欄なら何もしない
+  tasks.push({ text, done:false });
+  saveTasks();
+  renderTasks();
+  taskInput.value = '';
+  taskInput.focus();
+}
+addBtn.addEventListener('click', addTask);
+taskInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') addTask();
+});
+
+endTimeInput.addEventListener('change', () => {
+  endTime = endTimeInput.value;
+  saveSettings();
+});
+notifyIntervalInput.addEventListener('change', () => {
+  notifyInterval = Number(notifyIntervalInput.value) || 15;
+  saveSettings();
+});
+
+/* ---------- 4-a. 残り時間の計算(毎秒呼ばれる) ---------- */
+// 「今日の終業時刻」までのミリ秒を計算し、時:分:秒の文字列にして表示する
+function updateRemainingTime(){
+  const now = new Date();
+  const [h, m] = endTime.split(':').map(Number);
+  const end = new Date();
+  end.setHours(h, m, 0, 0);
+
+  const diffMs = end - now;
+
+  // すでに終業時刻を過ぎている場合
+  if (diffMs <= 0){
+    remainingTimeNum.textContent = '終業時刻を過ぎています';
+    timeCard.className = 'big-card danger';
+    return diffMs;
+  }
+
+  const totalSec = Math.floor(diffMs / 1000);
+  const hh = String(Math.floor(totalSec / 3600)).padStart(2, '0');
+  const mm = String(Math.floor((totalSec % 3600) / 60)).padStart(2, '0');
+  const ss = String(totalSec % 60).padStart(2, '0');
+  remainingTimeNum.textContent = `${hh}:${mm}:${ss}`;
+
+  // 8時間労働を基準に「残り30%未満で黄色、10%未満で赤」に切り替える
+  // (この8時間という基準は決め打ちなので、必要なら数値を変えればOK)
+  const totalWorkMs = 8 * 60 * 60 * 1000;
+  const ratio = diffMs / totalWorkMs;
+  timeCard.className = 'big-card ' + (ratio < 0.1 ? 'danger' : ratio < 0.3 ? 'warn' : 'safe');
+
+  return diffMs;
+}
+
+/* ---------- 4-b. 通知まわり(Duolingoみたいに「主張」する部分) ---------- */
+let notifyEnabled = false;
+let lastNotifyAt = 0;
+
+// ボタンを押すとブラウザに通知の許可をリクエストする
+notifyBtn.addEventListener('click', () => {
+  if (!('Notification' in window)){
+    alert('この端末・ブラウザは通知に対応していません');
+    return;
+  }
+  Notification.requestPermission().then((permission) => {
+    if (permission === 'granted'){
+      notifyEnabled = true;
+      notifyBtn.textContent = '通知オン(このタブを開いたままにしてね)';
+      lastNotifyAt = Date.now(); // 許可した直後にすぐ鳴らないようにリセット
+    } else {
+      alert('通知が許可されませんでした。ブラウザの設定から許可してください。');
+    }
+  });
+});
+
+// 音で主張する(外部の音声ファイルは使わず、Web Audio APIでビープ音を作る)
+function playBeep(){
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const osc = ctx.createOscillator();
+  osc.type = 'sine';
+  osc.frequency.value = 880; // 音の高さ(Hz)
+  osc.connect(ctx.destination);
+  osc.start();
+  setTimeout(() => { osc.stop(); ctx.close(); }, 300); // 0.3秒だけ鳴らして止める
+}
+
+// スマホなら振動でも主張する(対応していない端末では何も起きないだけ)
+function vibrate(){
+  if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+}
+
+// 通知本体:残りタスク数と残り時間をまとめて知らせる
+function fireNotification(remainingMs){
+  const remaining = tasks.filter(t => !t.done).length;
+  const minutesLeft = Math.max(0, Math.floor(remainingMs / 60000));
+
+  if (notifyEnabled){
+    new Notification('スケジュール確認', {
+      body: `残りタスク ${remaining}件 / 残り時間 約${minutesLeft}分だよ`,
+      tag: 'schedule-tracker' // 同じtagにすると通知が積み重ならず1つに上書きされる
+    });
+  }
+  playBeep();
+  vibrate();
+  lastNotifyAt = Date.now();
+}
+
+/* ---------- メインループ ----------
+   1秒ごとに残り時間を再計算して表示を更新し、
+   「前回の通知からnotifyInterval分経過していたら」通知を出す ---------- */
+setInterval(() => {
+  const remainingMs = updateRemainingTime();
+  const intervalMs = notifyInterval * 60 * 1000;
+  if (Date.now() - lastNotifyAt >= intervalMs){
+    fireNotification(remainingMs);
+  }
+}, 1000);
+
+/* ---------- 初期描画(ページを開いた瞬間に一度実行) ---------- */
+renderTasks();
+updateRemainingTime();
+</script>
+</body>
+</html>
