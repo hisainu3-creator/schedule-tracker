@@ -4,185 +4,259 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>残りタスク&時間トラッカー</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap" rel="stylesheet">
 <style>
   /* ============================================================
-     見た目のルール:とにかく文字を大きく、色でしか判断しなくていい
-     ようにする(緑=余裕、黄=注意、赤=やばい)。ボタンも最小限にして
-     「バカでも理解できる」を優先する。
+     見た目の方針:丸っこいフォント+パステルカラーで「かわいく」。
+     ただし情報自体は今まで通り「バカでも理解できる」を最優先に、
+     数字とバー(ゲージ)で直感的にわかるようにする。
+     色の意味: 緑=余裕 / 黄=注意 / 赤+炎=炎上(締切ヤバい)
      ============================================================ */
   :root{
-    --bg:#0f172a;
-    --card:#1e293b;
-    --text:#f8fafc;
-    --sub:#94a3b8;
-    --safe:#22c55e;
-    --warn:#f59e0b;
-    --danger:#ef4444;
+    --bg:#fff6ef;         /* ページ全体の背景。クリーム色でやわらかく */
+    --card:#ffffff;       /* カードの背景 */
+    --text:#4a3f3f;       /* メインの文字色 */
+    --sub:#a89a95;        /* サブテキスト・ラベル */
+    --border:#f1e3d8;
+    --safe:#8fd694;       /* 緑:余裕 */
+    --safe-bg:#e9f9ea;
+    --warn:#ffc861;       /* 黄:注意 */
+    --warn-bg:#fff5e2;
+    --fire:#ff6b6b;       /* 赤:炎上 */
+    --fire-bg:#ffe8e8;
   }
   *{ box-sizing:border-box; }
   body{
     margin:0;
-    font-family:-apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+    font-family:"M PLUS Rounded 1c", "Hiragino Sans", "Yu Gothic", sans-serif;
     background:var(--bg);
     color:var(--text);
     min-height:100vh;
     display:flex;
     flex-direction:column;
     align-items:center;
-    padding:24px 16px 60px;
+    padding:22px 16px 70px;
+    transition:background .5s ease; /* 通常時↔炎上時の色変化をなめらかにする */
   }
-  h1{ font-size:16px; color:var(--sub); font-weight:500; margin:4px 0 20px; }
+  /* ===== 画面全体の「炎上」演出 =====
+     どれか1つでも案件が炎上したら<body>にこのクラスがJSから付く。
+     背景全体が赤くパルスするので、画面をチラ見しただけで「ヤバい」と分かる。 */
+  body.fire-alert{
+    animation:bg-fire-pulse 1.3s ease-in-out infinite;
+  }
+  @keyframes bg-fire-pulse{
+    0%,100%{ background-color:#ffc9c9; }
+    50%{ background-color:#ff8f8f; }
+  }
+  h1{ font-size:16px; color:var(--sub); font-weight:700; margin:2px 0 18px; position:relative; z-index:1; }
 
-  /* 残りタスク数・残り時間を表示する巨大カード共通スタイル */
-  .big-card{
+  /* ---------- 共通カード ---------- */
+  .card{
     width:100%;
-    max-width:420px;
+    max-width:440px;
     background:var(--card);
-    border-radius:24px;
-    padding:26px 20px;
-    text-align:center;
-    margin-bottom:16px;
-    transition:background .4s ease, box-shadow .4s ease;
+    border-radius:22px;
+    padding:20px 20px;
+    margin-bottom:14px;
+    box-shadow:0 4px 14px rgba(180,140,110,0.08);
   }
+
+  /* ---------- 就業時間までの巨大カウント(全体) ---------- */
+  #overallCard{ text-align:center; transition:background .4s ease; }
   .big-number{
-    font-size:60px;
+    font-size:52px;
     font-weight:800;
     line-height:1;
-    letter-spacing:-1px;
-    font-variant-numeric:tabular-nums; /* 数字の桁がガタガタ動かないようにする */
+    font-variant-numeric:tabular-nums;
   }
-  .big-label{
-    font-size:13px;
-    color:var(--sub);
-    margin-top:8px;
-  }
-  /* 残り時間カードは緑/黄/赤で枠が光るようにして、色だけで緊急度がわかるようにする */
-  #timeCard.safe{ box-shadow:0 0 0 3px var(--safe) inset; }
-  #timeCard.warn{ box-shadow:0 0 0 3px var(--warn) inset; }
-  #timeCard.danger{ box-shadow:0 0 0 3px var(--danger) inset; animation:pulse 1s infinite; }
-  @keyframes pulse{
-    0%,100%{ transform:scale(1); }
-    50%{ transform:scale(1.02); }
-  }
+  .big-label{ font-size:12px; color:var(--sub); margin-top:6px; font-weight:700; }
 
-  /* 終業時刻・通知間隔などの設定エリア */
-  .settings{
+  /* ゲージ(バー)の共通スタイル。丸いピル型にして角を全部丸める */
+  .gauge-track{
     width:100%;
-    max-width:420px;
-    background:var(--card);
-    border-radius:16px;
-    padding:14px 16px;
-    margin-bottom:16px;
+    height:16px;
+    background:#f2e9e2;
+    border-radius:999px;
+    overflow:hidden;
+    margin-top:14px;
   }
-  .settings label{ display:block; font-size:12px; color:var(--sub); margin-bottom:4px; }
-  .settings-row{ display:flex; gap:10px; }
-  .settings-row > div{ flex:1; }
-  input[type="time"], input[type="number"]{
+  .gauge-fill{
+    height:100%;
+    border-radius:999px;
+    transition:width .5s ease, background-color .5s ease;
+  }
+  .gauge-fill.safe{ background:var(--safe); }
+  .gauge-fill.warn{ background:var(--warn); }
+  .gauge-fill.fire{ background:var(--fire); }
+
+  /* ---------- 設定エリア ---------- */
+  .settings-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px 12px;
+  }
+  .settings-grid label{ display:block; font-size:11px; color:var(--sub); font-weight:700; margin-bottom:4px; }
+  input[type="time"], input[type="number"], input[type="text"]{
     width:100%;
     padding:10px;
-    border-radius:8px;
-    border:1px solid #334155;
-    background:#0f172a;
+    border-radius:12px;
+    border:2px solid var(--border);
+    background:#fffdfb;
     color:var(--text);
-    font-size:16px; /* 16px未満だとiPhoneが勝手にズームするので必ず16px以上 */
+    font-family:inherit;
+    font-size:16px; /* iPhoneの勝手ズーム防止のため16px以上必須 */
+  }
+  input:focus{ outline:none; border-color:#ffc0a0; }
+
+  /* ---------- タスク追加フォーム ---------- */
+  #addForm .settings-grid{ grid-template-columns:1.4fr 1fr 1fr; margin-bottom:10px; }
+  #addBtn{
+    width:100%;
+    padding:12px;
+    border:none;
+    border-radius:14px;
+    background:#ffab7a;
+    color:#fff;
+    font-family:inherit;
+    font-size:15px;
+    font-weight:800;
   }
 
-  /* タスク追加フォーム */
-  .add-row{
-    width:100%;
-    max-width:420px;
-    display:flex;
-    gap:8px;
-    margin-bottom:12px;
-  }
-  #taskInput{
-    flex:1;
-    padding:14px;
-    border-radius:12px;
-    border:1px solid #334155;
+  /* ---------- 案件(タスク)ごとのカード ---------- */
+  #taskList{ width:100%; max-width:440px; }
+  .task-card{
+    position:relative; /* 右上に炎アイコンを絶対配置するための基準 */
     background:var(--card);
-    color:var(--text);
-    font-size:16px;
+    border-radius:20px;
+    padding:16px 18px;
+    margin-bottom:12px;
+    box-shadow:0 4px 14px rgba(180,140,110,0.08);
+    border:2px solid transparent;
   }
-  #addBtn{
-    padding:0 22px;
-    border:none;
-    border-radius:12px;
-    background:#3b82f6;
-    color:#fff;
-    font-size:16px;
+  /* 炎上中だけ現れる、カード右上のでっかい炎アイコン。ゆらゆら揺れて目立たせる */
+  .flame-icon{
+    display:none;
+    position:absolute;
+    top:-14px;
+    right:-8px;
+    font-size:30px;
+    animation:flame-flicker .7s ease-in-out infinite alternate;
+    filter:drop-shadow(0 2px 3px rgba(255,90,90,0.5));
+  }
+  .status-fire .flame-icon{ display:block; }
+  @keyframes flame-flicker{
+    0%{ transform:scale(1) rotate(-4deg); }
+    100%{ transform:scale(1.18) rotate(4deg); }
+  }
+  .task-card.status-warn{ border-color:var(--warn-bg); background:var(--warn-bg); }
+  .task-card.status-fire{ border-color:#ffb3b3; background:var(--fire-bg); animation:fireshake 1.4s infinite; }
+  .task-card.status-done{ opacity:.5; }
+  @keyframes fireshake{
+    0%,100%{ transform:translateX(0); }
+    25%{ transform:translateX(-1px) rotate(-0.3deg); }
+    75%{ transform:translateX(1px) rotate(0.3deg); }
+  }
+
+  .task-top{ display:flex; align-items:flex-start; gap:10px; }
+  .task-top input[type="checkbox"]{ width:22px; height:22px; margin-top:2px; flex-shrink:0; }
+  .task-name{ flex:1; font-size:16px; font-weight:700; word-break:break-word; }
+  .task-name.done{ text-decoration:line-through; }
+  .task-del{ background:none; border:none; color:var(--sub); font-size:18px; padding:2px 6px; }
+
+  .task-meta{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-top:8px;
+    font-size:12px;
+    color:var(--sub);
     font-weight:700;
   }
-
-  /* タスク一覧 */
-  ul#taskList{
-    list-style:none;
-    padding:0;
-    margin:0;
-    width:100%;
-    max-width:420px;
-  }
-  ul#taskList li{
-    display:flex;
+  .task-remaining{ font-size:14px; font-variant-numeric:tabular-nums; }
+  .fire-badge{
+    display:none;
     align-items:center;
-    gap:10px;
-    background:var(--card);
-    padding:14px;
-    border-radius:12px;
-    margin-bottom:8px;
-    font-size:16px;
+    gap:4px;
+    background:var(--fire);
+    color:#fff;
+    border-radius:999px;
+    padding:2px 10px;
+    font-size:12px;
+    font-weight:800;
+    margin-left:8px;
   }
-  ul#taskList li.done{ opacity:.4; text-decoration:line-through; }
-  ul#taskList li input[type="checkbox"]{ width:22px; height:22px; flex-shrink:0; }
-  ul#taskList li span{ flex:1; word-break:break-word; }
-  ul#taskList li button{
-    background:none;
-    border:none;
-    color:var(--sub);
-    font-size:20px;
-    padding:4px 8px;
-  }
+  .status-fire .fire-badge{ display:inline-flex; }
 
   #notifyBtn{
     width:100%;
-    max-width:420px;
+    max-width:440px;
     padding:14px;
-    border-radius:12px;
-    border:1px dashed #475569;
+    border-radius:16px;
+    border:2px dashed #e3cdbd;
     background:transparent;
     color:var(--sub);
-    font-size:14px;
-    margin-top:8px;
+    font-family:inherit;
+    font-size:13px;
+    font-weight:700;
+    margin-top:6px;
   }
-  .hint{
-    max-width:420px;
-    font-size:12px;
-    color:var(--sub);
+  .empty-hint{
+    max-width:440px;
     text-align:center;
-    margin-top:14px;
-    line-height:1.6;
+    color:var(--sub);
+    font-size:13px;
+    padding:20px 10px;
   }
+
+  /* ---------- ゲーム性:今日のスコアカード ---------- */
+  /* 「炎上せずに終わらせられたか」を数字で見える化して、ちょっとしたゲーム感を出す */
+  .score-row{ display:flex; justify-content:space-around; }
+  .score-item{ text-align:center; }
+  .score-num{ display:block; font-size:26px; font-weight:800; line-height:1; }
+  .score-label{ font-size:11px; color:var(--sub); font-weight:700; margin-top:4px; display:block; }
+  .score-item.safe .score-num{ color:#4caf7a; }
+  .score-item.fire .score-num{ color:var(--fire); }
+  .score-item.burn .score-num{ color:#8a5a5a; }
 </style>
 </head>
 <body>
 
 <h1>今日の残りタスク&時間</h1>
 
-<!-- 残りタスク数の巨大表示。ここを見るだけで「あと何個やればいいか」が一瞬でわかる -->
-<div class="big-card" id="taskCard">
-  <div class="big-number" id="remainingTasksNum">0</div>
-  <div class="big-label">残りタスク数</div>
-</div>
-
-<!-- 残り時間の巨大表示。カード枠の色が緑→黄→赤に変わって緊急度を伝える -->
-<div class="big-card" id="timeCard">
+<!-- ===== ① 就業時間までの全体カウント(既存機能・見た目だけ刷新) ===== -->
+<div class="card" id="overallCard">
   <div class="big-number" id="remainingTimeNum">--:--:--</div>
   <div class="big-label">終業までの残り時間</div>
+  <div class="gauge-track"><div class="gauge-fill safe" id="overallGauge" style="width:100%"></div></div>
 </div>
 
-<!-- 終業時刻・通知間隔の設定。ここで「何時までに終わらせたいか」を決める -->
-<div class="settings">
-  <div class="settings-row">
+<!-- ===== ①-2 今日のスコア(ゲーム性:炎上せずに終わらせられたか) ===== -->
+<div class="card" id="scoreCard">
+  <div class="score-row">
+    <div class="score-item safe">
+      <span class="score-num" id="scoreSafe">0</span>
+      <span class="score-label">セーフクリア</span>
+    </div>
+    <div class="score-item fire">
+      <span class="score-num" id="scoreFire">0</span>
+      <span class="score-label">炎上クリア</span>
+    </div>
+    <div class="score-item burn">
+      <span class="score-num" id="scoreBurn">0</span>
+      <span class="score-label">全焼</span>
+    </div>
+  </div>
+</div>
+
+<!-- ===== ② 全体設定:開始・終業時刻/通知間隔/炎上ライン ===== -->
+<div class="card">
+  <div class="settings-grid">
+    <div>
+      <label>開始時刻</label>
+      <input type="time" id="startTimeInput">
+    </div>
     <div>
       <label>終業時刻</label>
       <input type="time" id="endTimeInput">
@@ -191,156 +265,133 @@
       <label>通知間隔(分)</label>
       <input type="number" id="notifyIntervalInput" min="1" value="15">
     </div>
+    <div>
+      <label>炎上ライン(残り%)</label>
+      <input type="number" id="fireLineInput" min="1" max="90" value="20">
+    </div>
   </div>
 </div>
 
-<!-- タスクの追加フォーム -->
-<div class="add-row">
-  <input type="text" id="taskInput" placeholder="タスクを入力してEnter">
-  <button id="addBtn">追加</button>
+<!-- ===== ③ 案件(タスク)追加フォーム ===== -->
+<div class="card" id="addForm">
+  <div class="settings-grid">
+    <div>
+      <label>案件名</label>
+      <input type="text" id="taskInput" placeholder="例: バナー修正">
+    </div>
+    <div>
+      <label>締切時刻</label>
+      <input type="time" id="deadlineInput">
+    </div>
+    <div>
+      <label>見積(分)</label>
+      <input type="number" id="estimateInput" min="1" value="60">
+    </div>
+  </div>
+  <button id="addBtn">＋ 案件を追加</button>
 </div>
 
-<ul id="taskList"></ul>
+<!-- ===== ④ 案件ごとのバー付きリスト ===== -->
+<div id="taskList"></div>
+<p class="empty-hint" id="emptyHint">案件を追加すると、ここに締切までのバーが並びます。</p>
 
-<button id="notifyBtn">通知をオンにする(スマホでも主張してくる)</button>
-
-<p class="hint">
-  スマホでアプリっぽく使うには:<br>
-  iPhone → Safariの共有ボタン →「ホーム画面に追加」<br>
-  Android → Chromeのメニュー →「ホーム画面に追加/インストール」<br>
-  通知はこの画面(タブ)を開いている間に鳴ります。
-</p>
+<button id="notifyBtn">通知をオンにする(炎上したら知らせてくれる)</button>
 
 <script>
 /* =====================================================================
-   このスクリプトは4つのパートに分かれています。
-   1. データの保存・読み込み  … localStorageでタスクと設定を記憶する
-   2. 画面の描画              … タスク一覧・残りタスク数を表示し直す
-   3. タスクの追加/完了/削除  … ユーザー操作に対応する
-   4. 残り時間の計算と通知     … 毎秒残り時間を計算し、一定間隔で
-                                「音・振動・通知」でしつこく知らせる
+   全体構成(6パート)
+   1. データ保存/読込 … localStorageで「全体設定」と「案件一覧」を記憶
+   2. 全体カウント(終業時刻まで) … 1秒ごとに計算してバーと数字を更新
+   3. 案件カードの描画 … 案件ごとの残り%からバーの色・炎上状態を決める
+   4. 案件の追加/完了/削除
+   5. 通知 … 炎上に切り替わった瞬間+定期的にしつこく知らせる
+   6. メインループ(setInterval)
    ===================================================================== */
 
 /* ---------- 1. データの保存・読み込み ---------- */
-// タスクは配列で管理: [{text:"資料作成", done:false}, ...]
-// ページを開いた瞬間にlocalStorageから読み込み、変更のたびに保存し直す
-// → これでタブを閉じても、次に開いたときにタスクが消えない
-let tasks = JSON.parse(localStorage.getItem('scheduleTasks') || '[]');
+// 案件は配列で管理。1件ごとに { text, deadline:"HH:MM", estimateMin, done } を持つ
+// deadline = その案件を何時までに終わらせたいか
+// estimateMin = そのためにかかると見積もった分数(バーの「満タン」の基準になる)
+let tasks = JSON.parse(localStorage.getItem('scheduleTasksV2') || '[]');
 
-// 終業時刻(文字列 "HH:MM")。初回は18:00をデフォルトにする
-let endTime = localStorage.getItem('scheduleEndTime') || '18:00';
-
-// 通知間隔(分)。初回は15分ごと
+let startTime     = localStorage.getItem('scheduleStartTime') || '09:00';
+let endTime       = localStorage.getItem('scheduleEndTime') || '18:00';
 let notifyInterval = Number(localStorage.getItem('scheduleNotifyInterval') || 15);
+let fireLine       = Number(localStorage.getItem('scheduleFireLine') || 20); // 残り何%で「炎上」にするか
 
-function saveTasks(){
-  localStorage.setItem('scheduleTasks', JSON.stringify(tasks));
-}
+function saveTasks(){ localStorage.setItem('scheduleTasksV2', JSON.stringify(tasks)); }
 function saveSettings(){
+  localStorage.setItem('scheduleStartTime', startTime);
   localStorage.setItem('scheduleEndTime', endTime);
   localStorage.setItem('scheduleNotifyInterval', String(notifyInterval));
+  localStorage.setItem('scheduleFireLine', String(fireLine));
 }
 
-/* ---------- 画面要素をまとめて取得 ---------- */
-const remainingTasksNum   = document.getElementById('remainingTasksNum');
+// ---- ゲーム性のためのスコア(セーフクリア/炎上クリア/全焼)を「今日」単位で記録 ----
+// 日付が変わったら自動的に0にリセットされる(前日の記録は残らないシンプル仕様)
+function todayStr(){ return new Date().toISOString().slice(0, 10); }
+
+let scoreData = JSON.parse(localStorage.getItem('scheduleScore') || 'null');
+if (!scoreData || scoreData.date !== todayStr()){
+  scoreData = { date: todayStr(), safeClears: 0, fireClears: 0, burnedOut: 0 };
+}
+function saveScore(){ localStorage.setItem('scheduleScore', JSON.stringify(scoreData)); }
+function renderScore(){
+  document.getElementById('scoreSafe').textContent = scoreData.safeClears;
+  document.getElementById('scoreFire').textContent = scoreData.fireClears;
+  document.getElementById('scoreBurn').textContent = scoreData.burnedOut;
+}
+
+/* ---------- 画面要素の取得 ---------- */
 const remainingTimeNum    = document.getElementById('remainingTimeNum');
-const timeCard            = document.getElementById('timeCard');
-const taskCard            = document.getElementById('taskCard');
-const taskListEl          = document.getElementById('taskList');
-const taskInput           = document.getElementById('taskInput');
-const addBtn               = document.getElementById('addBtn');
+const overallCard         = document.getElementById('overallCard');
+const overallGauge        = document.getElementById('overallGauge');
+const startTimeInput      = document.getElementById('startTimeInput');
 const endTimeInput        = document.getElementById('endTimeInput');
 const notifyIntervalInput = document.getElementById('notifyIntervalInput');
+const fireLineInput       = document.getElementById('fireLineInput');
+const taskInput           = document.getElementById('taskInput');
+const deadlineInput       = document.getElementById('deadlineInput');
+const estimateInput       = document.getElementById('estimateInput');
+const addBtn              = document.getElementById('addBtn');
+const taskListEl          = document.getElementById('taskList');
+const emptyHint           = document.getElementById('emptyHint');
 const notifyBtn           = document.getElementById('notifyBtn');
 
-// 設定フォームに、保存されていた値を反映しておく
+// 保存されていた設定を画面に反映
+startTimeInput.value = startTime;
 endTimeInput.value = endTime;
 notifyIntervalInput.value = notifyInterval;
+fireLineInput.value = fireLine;
+deadlineInput.value = endTime; // 締切の初期値は終業時刻にしておくと入力が楽
 
-/* ---------- 2. タスク一覧の描画 ---------- */
-// tasks配列の中身をもとに、<ul>の中身を毎回作り直すシンプルな方式
-function renderTasks(){
-  taskListEl.innerHTML = '';
+/* ---------- 設定変更イベント ---------- */
+startTimeInput.addEventListener('change', () => { startTime = startTimeInput.value; saveSettings(); });
+endTimeInput.addEventListener('change', () => { endTime = endTimeInput.value; saveSettings(); });
+notifyIntervalInput.addEventListener('change', () => { notifyInterval = Number(notifyIntervalInput.value) || 15; saveSettings(); });
+fireLineInput.addEventListener('change', () => { fireLine = Number(fireLineInput.value) || 20; saveSettings(); });
 
-  tasks.forEach((task, index) => {
-    const li = document.createElement('li');
-    if (task.done) li.classList.add('done');
-
-    // 完了/未完了を切り替えるチェックボックス
-    const checkbox = document.createElement('input');
-    checkbox.type = 'checkbox';
-    checkbox.checked = task.done;
-    checkbox.addEventListener('change', () => {
-      tasks[index].done = checkbox.checked;
-      saveTasks();
-      renderTasks(); // 残りタスク数の再計算も含めて描画し直す
-    });
-
-    // タスク名のテキスト
-    const span = document.createElement('span');
-    span.textContent = task.text;
-
-    // タスクを削除するボタン
-    const delBtn = document.createElement('button');
-    delBtn.textContent = '✕';
-    delBtn.setAttribute('aria-label', 'タスクを削除');
-    delBtn.addEventListener('click', () => {
-      tasks.splice(index, 1);
-      saveTasks();
-      renderTasks();
-    });
-
-    li.append(checkbox, span, delBtn);
-    taskListEl.appendChild(li);
-  });
-
-  // 未完了(done === false)のタスクだけ数えて、大きな数字として表示
-  const remaining = tasks.filter(t => !t.done).length;
-  remainingTasksNum.textContent = remaining;
-
-  // 残り0件なら達成感が出るように背景を緑寄りにする
-  taskCard.style.background = remaining === 0 ? '#14532d' : '#1e293b';
+/* ---------- 時刻文字列("HH:MM")から、今日のDateオブジェクトを作るヘルパー ---------- */
+function timeStrToDate(hhmm){
+  const [h, m] = hhmm.split(':').map(Number);
+  const d = new Date();
+  d.setHours(h, m, 0, 0);
+  return d;
 }
 
-/* ---------- 3. タスクの追加・設定変更のイベント ---------- */
-function addTask(){
-  const text = taskInput.value.trim();
-  if (!text) return; // 空欄なら何もしない
-  tasks.push({ text, done:false });
-  saveTasks();
-  renderTasks();
-  taskInput.value = '';
-  taskInput.focus();
-}
-addBtn.addEventListener('click', addTask);
-taskInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') addTask();
-});
-
-endTimeInput.addEventListener('change', () => {
-  endTime = endTimeInput.value;
-  saveSettings();
-});
-notifyIntervalInput.addEventListener('change', () => {
-  notifyInterval = Number(notifyIntervalInput.value) || 15;
-  saveSettings();
-});
-
-/* ---------- 4-a. 残り時間の計算(毎秒呼ばれる) ---------- */
-// 「今日の終業時刻」までのミリ秒を計算し、時:分:秒の文字列にして表示する
-function updateRemainingTime(){
+/* ---------- 2. 全体(終業時刻まで)のカウント計算 ---------- */
+function updateOverall(){
   const now = new Date();
-  const [h, m] = endTime.split(':').map(Number);
-  const end = new Date();
-  end.setHours(h, m, 0, 0);
-
+  const start = timeStrToDate(startTime);
+  const end = timeStrToDate(endTime);
   const diffMs = end - now;
+  const totalMs = Math.max(end - start, 1); // 0割り防止
 
-  // すでに終業時刻を過ぎている場合
   if (diffMs <= 0){
     remainingTimeNum.textContent = '終業時刻を過ぎています';
-    timeCard.className = 'big-card danger';
-    return diffMs;
+    overallGauge.style.width = '0%';
+    overallGauge.className = 'gauge-fill warn'; // 全体カウントは「炎上」にはしない(warnまで)
+    return;
   }
 
   const totalSec = Math.floor(diffMs / 1000);
@@ -349,20 +400,173 @@ function updateRemainingTime(){
   const ss = String(totalSec % 60).padStart(2, '0');
   remainingTimeNum.textContent = `${hh}:${mm}:${ss}`;
 
-  // 8時間労働を基準に「残り30%未満で黄色、10%未満で赤」に切り替える
-  // (この8時間という基準は決め打ちなので、必要なら数値を変えればOK)
-  const totalWorkMs = 8 * 60 * 60 * 1000;
-  const ratio = diffMs / totalWorkMs;
-  timeCard.className = 'big-card ' + (ratio < 0.1 ? 'danger' : ratio < 0.3 ? 'warn' : 'safe');
-
-  return diffMs;
+  const pct = Math.max(0, Math.min(100, (diffMs / totalMs) * 100));
+  overallGauge.style.width = pct + '%';
+  overallGauge.className = 'gauge-fill ' + overallStatusFromPct(pct);
 }
 
-/* ---------- 4-b. 通知まわり(Duolingoみたいに「主張」する部分) ---------- */
-let notifyEnabled = false;
-let lastNotifyAt = 0;
+/* 案件(タスク)専用:残り%から safe/warn/fire を判定する。炎上はここだけで使う */
+function statusFromPct(pct){
+  if (pct <= fireLine) return 'fire';
+  if (pct <= 50) return 'warn';
+  return 'safe';
+}
 
-// ボタンを押すとブラウザに通知の許可をリクエストする
+/* 全体(終業時刻)専用:こちらは「炎上」にはならない仕様。
+   就業時間そのものは案件のように燃え上がるものではないので、safe/warnの2段階だけにする */
+function overallStatusFromPct(pct){
+  return pct <= 30 ? 'warn' : 'safe';
+}
+
+/* ---------- 3. 案件カードの描画 ---------- */
+// 直前のステータスを覚えておき、「safeやwarn → fireに変わった瞬間」を検知するために使う
+let prevStatusMap = {};
+
+function renderTasks(){
+  taskListEl.innerHTML = '';
+  emptyHint.style.display = tasks.length === 0 ? 'block' : 'none';
+
+  tasks.forEach((task, index) => {
+    // 古いデータ(旧バージョン)にdeadline/estimateMinが無い場合の保険
+    if (!task.deadline) task.deadline = endTime;
+    if (!task.estimateMin) task.estimateMin = 60;
+
+    const now = new Date();
+    const deadlineDate = timeStrToDate(task.deadline);
+    const remainMs = deadlineDate - now;
+    const totalMs = task.estimateMin * 60000;
+    const pct = task.done ? 100 : Math.max(0, Math.min(100, (remainMs / totalMs) * 100));
+    const status = task.done ? 'done' : statusFromPct(pct);
+
+    const card = document.createElement('div');
+    card.className = 'task-card status-' + status;
+
+    // ---- 炎上中だけ表示される、右上のゆらゆら炎アイコン ----
+    const flameIcon = document.createElement('span');
+    flameIcon.className = 'flame-icon';
+    flameIcon.textContent = '🔥';
+    flameIcon.setAttribute('aria-hidden', 'true');
+    card.appendChild(flameIcon);
+
+    // ---- 上段:チェックボックス・案件名・削除ボタン ----
+    const top = document.createElement('div');
+    top.className = 'task-top';
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = task.done;
+    checkbox.addEventListener('change', () => {
+      // 「完了にした瞬間」だけスコアに加算する(チェックを外す操作ではカウントしない)
+      // ここがゲーム性の肝:炎上する前に消化できたか、炎上してから消化したかを記録する
+      if (checkbox.checked && !task.done){
+        if (status === 'fire'){
+          scoreData.fireClears++; // 🔥炎上した状態からのクリア
+        } else {
+          scoreData.safeClears++; // 🎉燃える前にクリアできた
+        }
+        saveScore();
+        renderScore();
+      }
+      tasks[index].done = checkbox.checked;
+      saveTasks();
+      renderTasks();
+    });
+
+    const name = document.createElement('div');
+    name.className = 'task-name' + (task.done ? ' done' : '');
+    name.textContent = task.text;
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'task-del';
+    delBtn.textContent = '✕';
+    delBtn.setAttribute('aria-label', '削除');
+    delBtn.addEventListener('click', () => {
+      tasks.splice(index, 1);
+      delete prevStatusMap[index];
+      saveTasks();
+      renderTasks();
+    });
+
+    top.append(checkbox, name, delBtn);
+
+    // ---- ゲージ(バー) ----
+    const gaugeTrack = document.createElement('div');
+    gaugeTrack.className = 'gauge-track';
+    const gaugeFill = document.createElement('div');
+    gaugeFill.className = 'gauge-fill ' + (task.done ? 'safe' : status);
+    gaugeFill.style.width = pct + '%';
+    gaugeTrack.appendChild(gaugeFill);
+
+    // ---- 下段:締切時刻・残り時間・炎上バッジ ----
+    const meta = document.createElement('div');
+    meta.className = 'task-meta';
+
+    const leftMeta = document.createElement('span');
+    leftMeta.textContent = `締切 ${task.deadline}`;
+
+    const rightMeta = document.createElement('span');
+    rightMeta.style.display = 'flex';
+    rightMeta.style.alignItems = 'center';
+    const remainSpan = document.createElement('span');
+    remainSpan.className = 'task-remaining';
+    if (task.done){
+      remainSpan.textContent = '完了';
+    } else if (remainMs <= 0){
+      remainSpan.textContent = '締切オーバー';
+    } else {
+      const totalSec = Math.floor(remainMs / 1000);
+      const hh = String(Math.floor(totalSec / 3600)).padStart(2, '0');
+      const mm = String(Math.floor((totalSec % 3600) / 60)).padStart(2, '0');
+      remainSpan.textContent = `残り ${hh}:${mm}`;
+    }
+    const fireBadge = document.createElement('span');
+    fireBadge.className = 'fire-badge';
+    fireBadge.textContent = '🔥 炎上中';
+    rightMeta.append(remainSpan, fireBadge);
+
+    meta.append(leftMeta, rightMeta);
+
+    card.append(top, gaugeTrack, meta);
+    taskListEl.appendChild(card);
+
+    // このタスクの現在ステータスを記録(通知の「切り替わった瞬間」判定に使う)
+    task._currentStatus = status;
+
+    // ---- 「全焼」判定:締切を過ぎても未完了のまま放置された案件を1回だけカウント ----
+    // task.burnedCounted フラグで、1つの案件につき1回しか加算されないようにしている
+    if (!task.done && remainMs <= 0 && !task.burnedCounted){
+      task.burnedCounted = true;
+      scoreData.burnedOut++;
+      saveScore();
+      renderScore();
+      saveTasks(); // burnedCountedフラグを保存しておく(再読み込みしても二重カウントしないため)
+    }
+  });
+
+  // ---- 画面全体の炎上演出:1件でも炎上中の案件があれば<body>を赤くパルスさせる ----
+  const anyFire = tasks.some(t => !t.done && t._currentStatus === 'fire');
+  document.body.classList.toggle('fire-alert', anyFire);
+}
+
+/* ---------- 4. 案件の追加 ---------- */
+function addTask(){
+  const text = taskInput.value.trim();
+  if (!text) return;
+  const deadline = deadlineInput.value || endTime;
+  const estimateMin = Number(estimateInput.value) || 60;
+  tasks.push({ text, deadline, estimateMin, done:false, burnedCounted:false });
+  saveTasks();
+  renderTasks();
+  taskInput.value = '';
+  taskInput.focus();
+}
+addBtn.addEventListener('click', addTask);
+taskInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') addTask(); });
+
+/* ---------- 5. 通知(炎上モードの主張) ---------- */
+let notifyEnabled = false;
+let lastPeriodicNotifyAt = 0;
+
 notifyBtn.addEventListener('click', () => {
   if (!('Notification' in window)){
     alert('この端末・ブラウザは通知に対応していません');
@@ -372,59 +576,76 @@ notifyBtn.addEventListener('click', () => {
     if (permission === 'granted'){
       notifyEnabled = true;
       notifyBtn.textContent = '通知オン(このタブを開いたままにしてね)';
-      lastNotifyAt = Date.now(); // 許可した直後にすぐ鳴らないようにリセット
+      lastPeriodicNotifyAt = Date.now();
     } else {
       alert('通知が許可されませんでした。ブラウザの設定から許可してください。');
     }
   });
 });
 
-// 音で主張する(外部の音声ファイルは使わず、Web Audio APIでビープ音を作る)
-function playBeep(){
+// 音(外部ファイル不要、Web Audio APIでビープを作る)
+function playBeep(freq = 880, duration = 300){
   const ctx = new (window.AudioContext || window.webkitAudioContext)();
   const osc = ctx.createOscillator();
   osc.type = 'sine';
-  osc.frequency.value = 880; // 音の高さ(Hz)
+  osc.frequency.value = freq;
   osc.connect(ctx.destination);
   osc.start();
-  setTimeout(() => { osc.stop(); ctx.close(); }, 300); // 0.3秒だけ鳴らして止める
+  setTimeout(() => { osc.stop(); ctx.close(); }, duration);
 }
+function vibrate(pattern){ if (navigator.vibrate) navigator.vibrate(pattern); }
 
-// スマホなら振動でも主張する(対応していない端末では何も起きないだけ)
-function vibrate(){
-  if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-}
-
-// 通知本体:残りタスク数と残り時間をまとめて知らせる
-function fireNotification(remainingMs){
-  const remaining = tasks.filter(t => !t.done).length;
-  const minutesLeft = Math.max(0, Math.floor(remainingMs / 60000));
-
+function sendNotification(title, body, tag){
   if (notifyEnabled){
-    new Notification('スケジュール確認', {
-      body: `残りタスク ${remaining}件 / 残り時間 約${minutesLeft}分だよ`,
-      tag: 'schedule-tracker' // 同じtagにすると通知が積み重ならず1つに上書きされる
-    });
+    new Notification(title, { body, tag });
   }
-  playBeep();
-  vibrate();
-  lastNotifyAt = Date.now();
 }
 
-/* ---------- メインループ ----------
-   1秒ごとに残り時間を再計算して表示を更新し、
-   「前回の通知からnotifyInterval分経過していたら」通知を出す ---------- */
+// 「安全/注意 → 炎上」に切り替わった瞬間、その案件だけをピンポイントで知らせる
+function checkFireTransitions(){
+  tasks.forEach((task, index) => {
+    if (task.done) return;
+    const prev = prevStatusMap[index];
+    const now = task._currentStatus;
+    if (prev !== 'fire' && now === 'fire'){
+      sendNotification('🔥 炎上モード突入', `「${task.text}」の残りが${fireLine}%を切りました！`, 'fire-' + index);
+      playBeep(1200, 400); // 炎上時は少し高い音で強めに主張
+      vibrate([100, 60, 100, 60, 200]);
+    }
+    prevStatusMap[index] = now;
+  });
+}
+
+// 通知間隔ごとに、全体状況+炎上中の案件名をまとめて知らせる
+function periodicNotify(){
+  const remainingCount = tasks.filter(t => !t.done).length;
+  const fireTasks = tasks.filter(t => !t.done && t._currentStatus === 'fire').map(t => t.text);
+  let body = `残りタスク ${remainingCount}件`;
+  if (fireTasks.length > 0){
+    body += ` / 🔥炎上中: ${fireTasks.join('、')}`;
+  }
+  sendNotification('スケジュール確認', body, 'periodic');
+  playBeep();
+  vibrate([200, 100, 200]);
+  lastPeriodicNotifyAt = Date.now();
+}
+
+/* ---------- 6. メインループ:1秒ごとに全部を再計算 ---------- */
 setInterval(() => {
-  const remainingMs = updateRemainingTime();
+  updateOverall();
+  renderTasks();          // 案件ごとの残り%・バー・炎上状態を更新
+  checkFireTransitions(); // 炎上に切り替わった瞬間だけ即通知
+
   const intervalMs = notifyInterval * 60 * 1000;
-  if (Date.now() - lastNotifyAt >= intervalMs){
-    fireNotification(remainingMs);
+  if (Date.now() - lastPeriodicNotifyAt >= intervalMs){
+    periodicNotify();
   }
 }, 1000);
 
-/* ---------- 初期描画(ページを開いた瞬間に一度実行) ---------- */
+/* ---------- 初期描画 ---------- */
+updateOverall();
 renderTasks();
-updateRemainingTime();
+renderScore();
 </script>
 </body>
 </html>
