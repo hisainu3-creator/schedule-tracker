@@ -19,13 +19,15 @@
     --card:#ffffff;
     --text:#4a3f3f;
     --sub:#a89a95;
-    --border:#f1e3d8;
+    --border:#e6cbb2;
     --safe:#8fd694;
     --safe-bg:#e9f9ea;
     --warn:#ffc861;
     --warn-bg:#fff5e2;
     --fire:#ff6b6b;
     --fire-bg:#ffe8e8;
+    --input-bg:#fffdfb;   /* 入力欄専用の背景色。カード背景(--card)とは別で持たせる */
+    --input-text:#4a3f3f; /* 入力欄専用の文字色。夜モードでも常に読めるようにする */
   }
   *{ box-sizing:border-box; }
   body{
@@ -49,10 +51,13 @@
     --card:#1c2748;
     --text:#eef1f8;
     --sub:#8b9bc7;
-    --border:#2b3560;
+    --border:#4a5a94;
     --safe-bg:#173425;
     --warn-bg:#3a2f12;
     --fire-bg:#3a1414;
+    /* 入力欄だけは夜モードでも濃紺の背景+白文字にして、常にはっきり読めるようにする */
+    --input-bg:#26325c;
+    --input-text:#f5f7fd;
   }
   /* どれか1つでも案件が炎上したら<body>にこのクラスがJSから付き、画面全体が赤くパルスする。
      夜モードより後に書くことで、炎上中は夜モードより優先して赤くなるようにする */
@@ -158,21 +163,24 @@
   .day-ended-msg{ font-size:14px; font-weight:800; padding:6px 0; }
 
   /* ---------- 設定エリア/追加フォーム共通のグリッド ---------- */
-  .settings-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px 12px; }
+  .settings-grid{ display:grid; grid-template-columns:1fr 1fr; gap:14px 14px; }
   .settings-grid label{ display:block; font-size:11px; color:var(--sub); font-weight:700; margin-bottom:4px; }
   input[type="time"], input[type="number"], input[type="text"]{
     width:100%;
-    padding:10px;
+    padding:11px 10px;
     border-radius:12px;
     border:2px solid var(--border);
-    background:#fffdfb;
-    color:var(--text);
+    background:var(--input-bg);
+    color:var(--input-text);
     font-family:inherit;
     font-size:16px;
   }
+  input::placeholder{ color:var(--sub); opacity:1; }
   input:focus{ outline:none; border-color:#ffc0a0; }
 
-  #addForm .settings-grid{ grid-template-columns:1.4fr 1fr 1fr; margin-bottom:10px; }
+  #addForm label{ display:block; font-size:11px; color:var(--sub); font-weight:700; margin-bottom:4px; }
+  #addForm .field-name{ margin-bottom:12px; } /* 案件名は単独の行にして、他の欄と圧迫しあわないようにする */
+  #addForm .settings-grid{ margin-bottom:12px; } /* 締切時刻/見積(分)はこの2カラムだけで組む */
   #addBtn{
     width:100%; padding:12px; border:none; border-radius:14px;
     background:#ffab7a; color:#fff; font-family:inherit; font-size:15px; font-weight:800;
@@ -355,8 +363,11 @@
 
 <!-- ===== ⑤ 案件の追加フォーム ===== -->
 <div class="card" id="addForm">
+  <div class="field-name">
+    <label>案件名</label>
+    <input type="text" id="taskInput" placeholder="例: バナー修正">
+  </div>
   <div class="settings-grid">
-    <div><label>案件名</label><input type="text" id="taskInput" placeholder="例: バナー修正"></div>
     <div><label>締切時刻</label><input type="time" id="deadlineInput"></div>
     <div><label>見積(分)</label><input type="number" id="estimateInput" min="1" value="60"></div>
   </div>
@@ -539,8 +550,11 @@ function updateOverall(){
   }
   // 就業終了/炎上中かどうかで、画面のテーマ(通常/夜/炎上)を切り替える
   document.body.classList.toggle('night-mode', dayData.state === 'ended');
-  startDayBtn.style.display = dayData.state === 'not-started' ? 'block' : 'none';
-  endDayBtn.style.display = dayData.state === 'ended' ? 'none' : 'block';
+  // 「作業中(working)」のときだけ終了ボタンを見せ、それ以外(未開始/終業後)は
+  // 開始ボタンを見せる。終業後もボタンが消えず、続けて働く場合は再開できるようにする。
+  const isWorking = dayData.state === 'working';
+  startDayBtn.style.display = isWorking ? 'none' : 'block';
+  endDayBtn.style.display = isWorking ? 'block' : 'none';
 
   if (dayData.state === 'ended'){
     remainingTimeNum.innerHTML = '<span class="day-ended-msg">お疲れさまでした🌙</span>';
