@@ -40,7 +40,22 @@
     padding:22px 16px 70px;
     transition:background .5s ease;
   }
-  /* どれか1つでも案件が炎上したら<body>にこのクラスがJSから付き、画面全体が赤くパルスする */
+  /* ===== 就業終了後の「夜モード」 =====
+     就業終了ボタンを押す(または終業時刻を過ぎる)と<body>にこのクラスが付き、
+     クリーム色だった画面全体が紺色の夜っぽいテーマに切り替わる。
+     CSS変数(--bg/--card/--text等)を上書きするだけで、他の要素は全部自動で追従する。 */
+  body.night-mode{
+    --bg:#10182f;
+    --card:#1c2748;
+    --text:#eef1f8;
+    --sub:#8b9bc7;
+    --border:#2b3560;
+    --safe-bg:#173425;
+    --warn-bg:#3a2f12;
+    --fire-bg:#3a1414;
+  }
+  /* どれか1つでも案件が炎上したら<body>にこのクラスがJSから付き、画面全体が赤くパルスする。
+     夜モードより後に書くことで、炎上中は夜モードより優先して赤くなるようにする */
   body.fire-alert{ animation:bg-fire-pulse 1.3s ease-in-out infinite; }
   @keyframes bg-fire-pulse{
     0%,100%{ background-color:#ffc9c9; }
@@ -90,6 +105,16 @@
   .gauge-fill.warn{ background:var(--warn); }
   .gauge-fill.fire{ background:var(--fire); }
 
+  /* 就業開始/就業終了ボタン(全体カウント用) */
+  .day-actions{ display:flex; gap:8px; margin-top:14px; }
+  .day-actions button{
+    flex:1; padding:10px; border-radius:12px; border:none;
+    font-family:inherit; font-size:13px; font-weight:800;
+  }
+  .day-actions .btn-start{ background:#fff; border:2px solid #ffab7a !important; color:#e08a55; }
+  .day-actions .btn-end{ background:#ffab7a; color:#fff; }
+  .day-ended-msg{ font-size:14px; font-weight:800; padding:6px 0; }
+
   /* ---------- 設定エリア/追加フォーム共通のグリッド ---------- */
   .settings-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px 12px; }
   .settings-grid label{ display:block; font-size:11px; color:var(--sub); font-weight:700; margin-bottom:4px; }
@@ -113,20 +138,7 @@
 
   /* ---------- 案件(タスク)ごとのカード ---------- */
   #taskList{ width:100%; max-width:440px; }
-  .task-swipe-wrap{
-    position:relative;
-    border-radius:20px;
-    margin-bottom:12px;
-    overflow:hidden; /* スワイプ中、下の赤い削除レイヤーがはみ出さないように */
-  }
-  .swipe-bg{
-    position:absolute; inset:0;
-    background:var(--fire);
-    color:#fff;
-    display:flex; align-items:center; justify-content:flex-end;
-    padding-right:22px;
-    font-weight:800; font-size:14px;
-  }
+  .task-swipe-wrap{ margin-bottom:12px; }
   .task-card{
     position:relative;
     background:var(--card);
@@ -134,7 +146,6 @@
     padding:16px 18px;
     box-shadow:0 4px 14px rgba(180,140,110,0.08);
     border:2px solid transparent;
-    touch-action:pan-y; /* 縦スクロールは邪魔せず、横方向だけJSでスワイプ判定する */
   }
   .task-card.status-warn{ border-color:var(--warn-bg); background:var(--warn-bg); }
   .task-card.status-fire{ border-color:#ffb3b3; background:var(--fire-bg); animation:fireshake 1.4s infinite; }
@@ -191,6 +202,40 @@
     background:none; border:none; font-family:inherit;
   }
 
+  /* ===== スライドして削除するボタン(参考画像の「Slide to subscribe」スタイル) =====
+     完了した案件だけに表示。ハンドルを右までドラッグすると削除される。
+     「隠れたジェスチャー」ではなく見た目で操作方法がわかるようにするのが狙い。 */
+  .slide-track{
+    position:relative;
+    height:50px;
+    border-radius:999px;
+    background:var(--bg);
+    border:2px solid var(--border);
+    margin-top:12px;
+    overflow:hidden;
+  }
+  .slide-fill{
+    position:absolute; left:0; top:0; bottom:0; width:50px;
+    background:var(--fire);
+    border-radius:999px;
+    pointer-events:none;
+  }
+  .slide-label{
+    position:absolute; inset:0;
+    display:flex; align-items:center; justify-content:center;
+    font-size:13px; font-weight:800; color:var(--sub);
+    pointer-events:none;
+  }
+  .slide-handle{
+    position:absolute; left:4px; top:4px;
+    width:42px; height:42px; border-radius:50%;
+    background:var(--text); color:var(--card);
+    display:flex; align-items:center; justify-content:center;
+    font-size:18px; font-weight:800;
+    touch-action:none; /* ハンドルの上では横ドラッグをブラウザに横取りされないようにする */
+    cursor:grab;
+  }
+
   /* インライン編集フォーム */
   .edit-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px; }
   .edit-actions{ display:flex; gap:8px; margin-top:8px; }
@@ -234,6 +279,10 @@
   <div class="big-number" id="remainingTimeNum">--:--:--</div>
   <div class="big-label">終業までの残り時間</div>
   <div class="gauge-track"><div class="gauge-fill safe" id="overallGauge" style="width:100%"></div></div>
+  <div class="day-actions">
+    <button class="btn-start" id="startDayBtn">▶ 就業開始</button>
+    <button class="btn-end" id="endDayBtn">■ 就業終了</button>
+  </div>
 </div>
 
 <!-- ===== ③ 今日のスコア(ゲーム性) ===== -->
@@ -321,6 +370,15 @@ if (!scoreData || scoreData.date !== todayStr()){
   scoreData = { date: todayStr(), safeClears: 0, fireClears: 0, burnedOut: 0 };
 }
 function saveScore(){ localStorage.setItem('scheduleScore', JSON.stringify(scoreData)); }
+
+// ---- 就業の開始/終了状態(1日単位でリセット) ----
+// state: 'not-started'(まだ始まっていない) / 'working'(就業中) / 'ended'(終業した)
+let dayData = JSON.parse(localStorage.getItem('scheduleDay') || 'null');
+if (!dayData || dayData.date !== todayStr()){
+  dayData = { date: todayStr(), state: 'not-started' };
+}
+function saveDay(){ localStorage.setItem('scheduleDay', JSON.stringify(dayData)); }
+
 function renderScore(){
   document.getElementById('scoreSafe').textContent = scoreData.safeClears;
   document.getElementById('scoreFire').textContent = scoreData.fireClears;
@@ -347,6 +405,8 @@ const currentTaskBody     = document.getElementById('currentTaskBody');
 const currentTaskName     = document.getElementById('currentTaskName');
 const currentTaskRemaining= document.getElementById('currentTaskRemaining');
 const currentTaskGauge    = document.getElementById('currentTaskGauge');
+const startDayBtn         = document.getElementById('startDayBtn');
+const endDayBtn           = document.getElementById('endDayBtn');
 
 startTimeInput.value = startTime;
 endTimeInput.value = endTime;
@@ -358,6 +418,21 @@ startTimeInput.addEventListener('change', () => { startTime = startTimeInput.val
 endTimeInput.addEventListener('change', () => { endTime = endTimeInput.value; saveSettings(); });
 notifyIntervalInput.addEventListener('change', () => { notifyInterval = Number(notifyIntervalInput.value) || 15; saveSettings(); });
 fireLineInput.addEventListener('change', () => { fireLine = Number(fireLineInput.value) || 20; saveSettings(); });
+
+// ---- 就業開始/就業終了ボタン ----
+function pad2(n){ return String(n).padStart(2, '0'); }
+startDayBtn.addEventListener('click', () => {
+  const now = new Date();
+  startTime = `${pad2(now.getHours())}:${pad2(now.getMinutes())}`; // 押した瞬間の時刻を開始時刻にする
+  startTimeInput.value = startTime;
+  saveSettings();
+  dayData.state = 'working';
+  saveDay();
+});
+endDayBtn.addEventListener('click', () => {
+  dayData.state = 'ended';
+  saveDay();
+});
 
 /* ---------- 2. 共通ヘルパー ---------- */
 function timeStrToDate(hhmm){
@@ -396,18 +471,30 @@ function formatHHMM(ms){
 /* ---------- 3. 全体(終業時刻まで)のカウント ---------- */
 function updateOverall(){
   const now = new Date();
-  const start = timeStrToDate(startTime);
   const end = timeStrToDate(endTime);
+
+  // 終業時刻を過ぎたら、ボタンを押していなくても自動で「終業」扱いにする
+  if (dayData.state !== 'ended' && now >= end){
+    dayData.state = 'ended';
+    saveDay();
+  }
+  // 就業終了/炎上中かどうかで、画面のテーマ(通常/夜/炎上)を切り替える
+  document.body.classList.toggle('night-mode', dayData.state === 'ended');
+  startDayBtn.style.display = dayData.state === 'not-started' ? 'block' : 'none';
+  endDayBtn.style.display = dayData.state === 'ended' ? 'none' : 'block';
+
+  if (dayData.state === 'ended'){
+    remainingTimeNum.innerHTML = '<span class="day-ended-msg">お疲れさまでした🌙</span>';
+    overallGauge.style.width = '100%';
+    overallGauge.className = 'gauge-fill safe';
+    return;
+  }
+
+  const start = timeStrToDate(startTime);
   const diffMs = end - now;
   const totalMs = Math.max(end - start, 1);
 
-  if (diffMs <= 0){
-    remainingTimeNum.textContent = '終業時刻を過ぎています';
-    overallGauge.style.width = '0%';
-    overallGauge.className = 'gauge-fill warn';
-    return;
-  }
-  const totalSec = Math.floor(diffMs / 1000);
+  const totalSec = Math.floor(Math.max(diffMs, 0) / 1000);
   const hh = String(Math.floor(totalSec / 3600)).padStart(2, '0');
   const mm = String(Math.floor((totalSec % 3600) / 60)).padStart(2, '0');
   const ss = String(totalSec % 60).padStart(2, '0');
@@ -487,37 +574,47 @@ function updateTaskFields(id, deadline, estimateMin, text){
   renderAll();
 }
 
-// 左スワイプで削除するための共通処理(完了済みカードだけに使う)
-function attachSwipeToDelete(cardEl, id){
+// 「スライドして削除」ハンドルのドラッグ処理(参考画像のSlide to subscribe方式)
+// ハンドルをトラックの右端近くまでドラッグすると削除が確定する
+function attachSlideToDelete(handleEl, trackEl, id){
   let startX = 0, dx = 0, dragging = false;
-  const threshold = 90;
+  let maxDrag = 1;
 
-  cardEl.addEventListener('pointerdown', (e) => {
+  handleEl.addEventListener('pointerdown', (e) => {
     dragging = true;
     startX = e.clientX;
-    cardEl.setPointerCapture(e.pointerId);
-    cardEl.style.transition = 'none';
+    maxDrag = trackEl.clientWidth - handleEl.clientWidth - 8; // ハンドルが動ける最大距離
+    handleEl.setPointerCapture(e.pointerId);
+    handleEl.style.transition = 'none';
   });
-  cardEl.addEventListener('pointermove', (e) => {
+  handleEl.addEventListener('pointermove', (e) => {
     if (!dragging) return;
-    dx = Math.min(0, e.clientX - startX); // 左方向(マイナス)にしか動かさない
-    cardEl.style.transform = `translateX(${dx}px)`;
+    dx = Math.max(0, Math.min(maxDrag, e.clientX - startX)); // 右方向にだけ、トラック内に収まる範囲で動かす
+    handleEl.style.transform = `translateX(${dx}px)`;
+    handleEl.parentElement.querySelector('.slide-fill').style.width = (dx + 46) + 'px';
   });
   function endDrag(){
     if (!dragging) return;
     dragging = false;
-    cardEl.style.transition = 'transform .25s ease';
-    if (dx < -threshold){
-      cardEl.style.transform = 'translateX(-120%)';
-      if (navigator.vibrate) navigator.vibrate(15); // 消えた瞬間の「気持ちよさ」を振動でも
-      setTimeout(() => deleteTaskById(id), 220);
+    handleEl.style.transition = 'transform .2s ease';
+    const fillEl = handleEl.parentElement.querySelector('.slide-fill');
+    fillEl.style.transition = 'width .2s ease';
+
+    if (dx > maxDrag * 0.75){
+      // 削除確定:ハンドルを右端まで滑らせてから消す(スライド完了の気持ちよさ)
+      handleEl.style.transform = `translateX(${maxDrag}px)`;
+      fillEl.style.width = '100%';
+      if (navigator.vibrate) navigator.vibrate(15);
+      setTimeout(() => deleteTaskById(id), 180);
     } else {
-      cardEl.style.transform = 'translateX(0)';
+      // 途中で離したら元の位置にスナックバック
+      handleEl.style.transform = 'translateX(0)';
+      fillEl.style.width = '50px';
     }
     dx = 0;
   }
-  cardEl.addEventListener('pointerup', endDrag);
-  cardEl.addEventListener('pointercancel', endDrag);
+  handleEl.addEventListener('pointerup', endDrag);
+  handleEl.addEventListener('pointercancel', endDrag);
 }
 
 function renderTasks(){
@@ -557,14 +654,6 @@ function renderTasks(){
 
     const wrap = document.createElement('div');
     wrap.className = 'task-swipe-wrap';
-
-    // 完了済みカードの背後に、スワイプすると見える赤い「削除」レイヤー
-    if (task.state === 'done'){
-      const bg = document.createElement('div');
-      bg.className = 'swipe-bg';
-      bg.textContent = '🗑 削除';
-      wrap.appendChild(bg);
-    }
 
     const card = document.createElement('div');
     card.className = 'task-card status-' + status;
@@ -696,6 +785,25 @@ function renderTasks(){
         actions.appendChild(endBtn);
         card.appendChild(actions);
       } else {
+        // ---- 完了済み:見た目でわかる「スライドして削除」ボタン ----
+        const track = document.createElement('div');
+        track.className = 'slide-track';
+
+        const fill = document.createElement('div');
+        fill.className = 'slide-fill';
+
+        const label = document.createElement('div');
+        label.className = 'slide-label';
+        label.textContent = 'スライドで削除';
+
+        const handle = document.createElement('div');
+        handle.className = 'slide-handle';
+        handle.textContent = '→';
+
+        track.append(fill, label, handle);
+        card.appendChild(track);
+        attachSlideToDelete(handle, track, task.id);
+
         // 誤って「終了」を押した時のための、控えめな取り消しリンク
         const undo = document.createElement('button');
         undo.className = 'undo-link';
@@ -707,11 +815,6 @@ function renderTasks(){
 
     wrap.appendChild(card);
     taskListEl.appendChild(wrap);
-
-    // 完了済みカードだけ、左スワイプで削除できるようにする
-    if (task.state === 'done'){
-      attachSwipeToDelete(card, task.id);
-    }
   });
 }
 
