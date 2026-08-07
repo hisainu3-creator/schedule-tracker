@@ -74,11 +74,41 @@
   }
 
   /* ---------- ①「今、何をやっているか」を表示する最重要カード ---------- */
-  #currentTaskCard{ text-align:center; border:2px solid transparent; }
+  #currentTaskCard{ text-align:center; border:3px solid transparent; }
   #currentTaskCard.status-warn{ border-color:var(--warn); background:var(--warn-bg); }
-  #currentTaskCard.status-fire{ border-color:var(--fire); background:var(--fire-bg); animation:fireshake 1.4s infinite; }
+  #currentTaskCard.status-fire{
+    border-style:dashed;
+    animation:fireshake 1.2s infinite, hazard-flash .6s linear infinite;
+    background:var(--fire-bg);
+  }
+  /* 炎上中は枠の色を黄⇔赤で交互に光らせて「工事現場の注意テープ」っぽい緊迫感を出す */
+  @keyframes hazard-flash{
+    0%,100%{ border-color:#ffcf3f; }
+    50%{ border-color:#ff3b3b; }
+  }
   #currentTaskName{ font-size:15px; font-weight:800; margin-bottom:2px; }
   #currentTaskEmpty{ font-size:13px; color:var(--sub); padding:6px 0; }
+
+  /* 大きな炎アイコン+表情の顔文字。ステータスに応じて大きさ・アニメーションを変える */
+  .fire-face-row{ display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:4px; }
+  .fire-face-row .big-flame{
+    font-size:30px; opacity:.3; filter:grayscale(1);
+    transition:font-size .3s ease, opacity .3s ease, filter .3s ease;
+  }
+  .fire-face-row .face-emoji{ font-size:38px; transition:font-size .3s ease; }
+  .fire-face-row.status-warn .big-flame{ font-size:42px; opacity:.75; filter:grayscale(.4); }
+  .fire-face-row.status-fire .big-flame{
+    font-size:66px; opacity:1; filter:none;
+    animation:flame-flicker .5s ease-in-out infinite alternate;
+  }
+  .fire-face-row.status-fire .face-emoji{
+    font-size:52px;
+    animation:face-wobble .35s ease-in-out infinite alternate;
+  }
+  @keyframes face-wobble{
+    0%{ transform:rotate(-7deg); }
+    100%{ transform:rotate(7deg); }
+  }
 
   .big-number{
     font-size:50px;
@@ -89,12 +119,24 @@
   .big-label{ font-size:12px; color:var(--sub); margin-top:6px; font-weight:700; }
 
   .gauge-track{
+    position:relative;
     width:100%;
     height:16px;
     background:#f2e9e2;
     border-radius:999px;
-    overflow:hidden;
+    overflow:visible; /* 炎マーカーがバーの外にはみ出さず綺麗に乗るように */
     margin-top:14px;
+  }
+  .gauge-track .gauge-fill{ overflow:hidden; border-radius:999px; } /* 中身の色バーだけ角を丸く切り取る */
+  /* バー上の「ここを切ると炎上する」目印。最初から表示しておき、事前に危険ラインが分かるようにする */
+  .gauge-fire-marker{
+    position:absolute;
+    top:50%;
+    transform:translate(-50%, -50%);
+    font-size:15px;
+    z-index:2;
+    filter:drop-shadow(0 1px 1px rgba(0,0,0,0.25));
+    pointer-events:none;
   }
   .gauge-fill{
     height:100%;
@@ -267,10 +309,17 @@
 <div class="card" id="currentTaskCard">
   <div id="currentTaskEmpty">作業中の案件はありません。下のリストで「開始」を押してください。</div>
   <div id="currentTaskBody" style="display:none;">
+    <div class="fire-face-row" id="fireFaceRow">
+      <span class="big-flame" id="bigFlame">🔥</span>
+      <span class="face-emoji" id="faceEmoji">😐</span>
+    </div>
     <div id="currentTaskName"></div>
     <div class="big-number" id="currentTaskRemaining">--:--</div>
     <div class="big-label">この案件の残り時間</div>
-    <div class="gauge-track"><div class="gauge-fill safe" id="currentTaskGauge" style="width:100%"></div></div>
+    <div class="gauge-track">
+      <span class="gauge-fire-marker" id="currentTaskFireMarker">🔥</span>
+      <div class="gauge-fill safe" id="currentTaskGauge" style="width:100%"></div>
+    </div>
   </div>
 </div>
 
@@ -405,8 +454,18 @@ const currentTaskBody     = document.getElementById('currentTaskBody');
 const currentTaskName     = document.getElementById('currentTaskName');
 const currentTaskRemaining= document.getElementById('currentTaskRemaining');
 const currentTaskGauge    = document.getElementById('currentTaskGauge');
+const currentTaskFireMarker = document.getElementById('currentTaskFireMarker');
+const fireFaceRow         = document.getElementById('fireFaceRow');
+const faceEmoji           = document.getElementById('faceEmoji');
 const startDayBtn         = document.getElementById('startDayBtn');
 const endDayBtn           = document.getElementById('endDayBtn');
+
+// ステータスに応じた表情の顔文字(セーフ=無表情、注意=困り顔、炎上=泣き顔)
+function faceForStatus(status){
+  if (status === 'fire') return '😭';
+  if (status === 'warn') return '😟';
+  return '😐';
+}
 
 startTimeInput.value = startTime;
 endTimeInput.value = endTime;
@@ -523,9 +582,14 @@ function renderCurrentTask(){
   currentTaskRemaining.textContent = remainMs <= 0 ? '締切オーバー' : formatHHMM(remainMs);
   currentTaskGauge.style.width = Math.max(0, pct) + '%';
   currentTaskGauge.className = 'gauge-fill ' + status;
+  currentTaskFireMarker.style.left = fireLine + '%'; // 炎上ライン設定が変わっても常に正しい位置に
   if (status === 'warn' || status === 'fire'){
     currentTaskCard.classList.add('status-' + status);
   }
+
+  // 大きな炎+表情:ステータスに応じてクラスを切り替えるとCSS側でサイズ・アニメが変わる
+  fireFaceRow.className = 'fire-face-row status-' + status;
+  faceEmoji.textContent = faceForStatus(status);
 }
 
 /* ---------- 5. 案件一覧の描画 ---------- */
@@ -743,6 +807,14 @@ function renderTasks(){
       // ---- 通常モード:ゲージ+締切/残り時間+開始・終了ボタン ----
       const gaugeTrack = document.createElement('div');
       gaugeTrack.className = 'gauge-track';
+      if (task.state !== 'done'){
+        // このバーのどこで炎上が始まるか、最初から炎アイコンで示しておく
+        const marker = document.createElement('span');
+        marker.className = 'gauge-fire-marker';
+        marker.textContent = '🔥';
+        marker.style.left = fireLine + '%';
+        gaugeTrack.appendChild(marker);
+      }
       const gaugeFill = document.createElement('div');
       gaugeFill.className = 'gauge-fill ' + (task.state === 'done' ? 'safe' : status);
       gaugeFill.style.width = task._pct + '%';
@@ -764,7 +836,16 @@ function renderTasks(){
       const fireBadge = document.createElement('span');
       fireBadge.className = 'fire-badge';
       fireBadge.textContent = '🔥 炎上中';
-      rightMeta.append(remainSpan, fireBadge);
+
+      if (task.state !== 'done'){
+        const faceSpan = document.createElement('span');
+        faceSpan.style.fontSize = '16px';
+        faceSpan.style.marginLeft = '6px';
+        faceSpan.textContent = faceForStatus(status);
+        rightMeta.append(remainSpan, faceSpan, fireBadge);
+      } else {
+        rightMeta.append(remainSpan, fireBadge);
+      }
       meta.append(leftMeta, rightMeta);
       card.appendChild(meta);
 
@@ -897,7 +978,18 @@ function periodicNotify(){
 /* ---------- 8. メインループ ---------- */
 setInterval(() => {
   updateOverall();
-  renderAll();
+
+  // ここが重要なバグ修正ポイント:
+  // 案件一覧(renderTasks)は毎秒DOMを丸ごと作り直すので、編集フォームを開いている
+  // 最中にこれが走ると、時刻ピッカーを操作している途中でinput要素が消えてしまい
+  // 「締切時間が変更できない」という不具合になっていた。
+  // → 編集中(editingIds.size > 0)は一覧の再構築を止め、他の部分だけ更新する。
+  if (editingIds.size === 0){
+    renderTasks();
+  }
+  renderCurrentTask();
+  renderScore();
+
   checkFireTransitions();
   const intervalMs = notifyInterval * 60 * 1000;
   if (Date.now() - lastPeriodicNotifyAt >= intervalMs) periodicNotify();
