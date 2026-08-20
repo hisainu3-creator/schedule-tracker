@@ -332,6 +332,16 @@
   .score-item.fire .score-num{ color:var(--fire); }
   .score-item.burn .score-num{ color:#8a5a5a; }
 
+  /* 直近7日間のトレンド:1日1つの丸で「その日燃えたかどうか」を並べる */
+  .history-label{ font-size:11px; color:var(--sub); font-weight:700; margin-bottom:10px; }
+  .week-dots{ display:flex; justify-content:space-between; margin-bottom:12px; }
+  .week-dot{ width:24px; height:24px; border-radius:50%; }
+  .week-dot.nodata{ background:#f2e9e2; }
+  .week-dot.good{ background:var(--safe); }
+  .week-dot.mid{ background:var(--warn); }
+  .week-dot.bad{ background:var(--fire); }
+  .week-summary{ font-size:14px; font-weight:800; text-align:center; }
+
   /* ============================================================
      初回説明(オンボーディング)オーバーレイ。
      Headspaceの「上半分カラーブロック+下半分白+説明+大きいCTA」を参考に、
@@ -426,6 +436,13 @@
   </div>
 </div>
 
+<!-- ===== ③-2 直近7日間のトレンド ===== -->
+<div class="card">
+  <div class="history-label">直近7日間(緑=炎上ゼロ / 黄=1〜2件 / 赤=3件以上)</div>
+  <div class="week-dots" id="weekDots"></div>
+  <div class="week-summary" id="weekSummary"></div>
+</div>
+
 <!-- ===== ④ 全体設定 ===== -->
 <div class="card">
   <div class="settings-grid">
@@ -500,8 +517,32 @@ function saveSettings(){
 }
 
 function todayStr(){ return new Date().toISOString().slice(0, 10); }
+
+// ---- 日別の履歴(過去のスコアを日付ごとに積み上げて保存する) ----
+// 1日分のレコードは { date, safeClears, fireClears, burnedOut } の4項目だけなので、
+// 1年分貯めても数十KB程度。念のため直近90日分だけ残すようにしておく。
+function loadHistory(){ return JSON.parse(localStorage.getItem('scheduleScoreHistory') || '[]'); }
+function saveHistory(history){
+  const trimmed = history.slice(-90); // 直近90日だけ残す
+  localStorage.setItem('scheduleScoreHistory', JSON.stringify(trimmed));
+}
+
 let scoreData = JSON.parse(localStorage.getItem('scheduleScore') || 'null');
 if (!scoreData || scoreData.date !== todayStr()){
+  // 日付が変わったタイミングで、それまでのscoreDataを履歴に確定させてから
+  // 今日の分をリセットする(ここを通らないと前日の記録が消えてしまう)
+  if (scoreData){
+    const history = loadHistory();
+    if (!history.some((h) => h.date === scoreData.date)){
+      history.push({
+        date: scoreData.date,
+        safeClears: scoreData.safeClears,
+        fireClears: scoreData.fireClears,
+        burnedOut: scoreData.burnedOut,
+      });
+      saveHistory(history);
+    }
+  }
   scoreData = { date: todayStr(), safeClears: 0, fireClears: 0, burnedOut: 0 };
 }
 function saveScore(){ localStorage.setItem('scheduleScore', JSON.stringify(scoreData)); }
@@ -518,6 +559,50 @@ function renderScore(){
   document.getElementById('scoreSafe').textContent = scoreData.safeClears;
   document.getElementById('scoreFire').textContent = scoreData.fireClears;
   document.getElementById('scoreBurn').textContent = scoreData.burnedOut;
+  renderHistory();
+}
+
+// 過去n日分(今日を含む、日付の古い→新しい順)のスコアをまとめて返す。
+// 履歴に記録が無い日は「データなし」として扱う(アプリを開かなかった日など)
+function getRecentDays(n){
+  const history = loadHistory();
+  const map = {};
+  history.forEach((h) => { map[h.date] = h; });
+  map[scoreData.date] = scoreData; // 今日はまだ履歴に確定していないので、現在値をここで補う
+
+  const days = [];
+  for (let i = n - 1; i >= 0; i--){
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    const rec = map[key];
+    days.push({
+      date: key,
+      fireTotal: rec ? rec.fireClears + rec.burnedOut : 0,
+      hasData: !!rec,
+    });
+  }
+  return days;
+}
+
+function renderHistory(){
+  const weekDots = document.getElementById('weekDots');
+  const weekSummary = document.getElementById('weekSummary');
+  const days = getRecentDays(7);
+
+  weekDots.innerHTML = '';
+  days.forEach((d) => {
+    const dot = document.createElement('span');
+    let cls = 'nodata';
+    if (d.hasData) cls = d.fireTotal === 0 ? 'good' : d.fireTotal <= 2 ? 'mid' : 'bad';
+    dot.className = 'week-dot ' + cls;
+    weekDots.appendChild(dot);
+  });
+
+  const weekTotal = days.reduce((sum, d) => sum + d.fireTotal, 0);
+  weekSummary.textContent = weekTotal === 0
+    ? '🎉 今週は炎上・全焼ゼロ達成!'
+    : `今週の炎上・全焼:合計${weekTotal}件`;
 }
 
 /* ---------- 画面要素の取得 ---------- */
@@ -560,11 +645,6 @@ onboardingStartBtn.addEventListener('click', () => {
 });
 // 「使い方」ボタンでいつでも見返せるようにする
 helpBtn.addEventListener('click', () => { onboardingOverlay.style.display = 'flex'; });
-
-// 静止画のマスコット(空状態/オンボーディング)は最初に1回だけSVGを流し込む
-emptyMascot.innerHTML = mascotFaceSvg('sleepy', 60);
-onboardingMascot.innerHTML = mascotFaceSvg('safe', 76);
-currentTaskFireMarker.innerHTML = flameSvg(16);
 
 /* =====================================================================
    ラフ仮素材(SVG):絵文字だと表現の幅が狭く「素材感」が薄いので、
@@ -620,6 +700,14 @@ function flameSvg(size){
     <path d="M50 30 C61 45 65 55 58 66 C55 73 50 81 50 81 C50 81 45 73 42 66 C35 55 39 45 50 30 Z" fill="#ffc861"/>
   </svg>`;
 }
+
+// 静止画のマスコット(空状態/オンボーディング)は最初に1回だけSVGを流し込む
+// (この呼び出しは、上のFACE_PATHS/mascotFaceSvg/flameSvgの定義より後ろに
+//  置くのが重要。先に呼んでしまうと「まだ定義されていない変数」を参照して
+//  エラーになり、そこでスクリプト全体が止まってしまう=今回の不具合の原因だった)
+emptyMascot.innerHTML = mascotFaceSvg('sleepy', 60);
+onboardingMascot.innerHTML = mascotFaceSvg('safe', 76);
+currentTaskFireMarker.innerHTML = flameSvg(16);
 
 startTimeInput.value = startTime;
 endTimeInput.value = endTime;
