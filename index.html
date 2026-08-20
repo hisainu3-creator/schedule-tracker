@@ -116,6 +116,16 @@
   .mascot.warn{ background:#ffc861; }
   .mascot.fire{ background:#ff6b6b; animation:flame-flicker .5s ease-in-out infinite alternate; }
 
+  /* タスク一覧の行内に置く、マスコットの小サイズ版(丸い色付き背景+同じ表情SVG) */
+  .mascot-mini{
+    width:24px; height:24px; border-radius:50%;
+    display:inline-flex; align-items:center; justify-content:center;
+    flex-shrink:0;
+  }
+  .mascot-mini.safe{ background:var(--safe); }
+  .mascot-mini.warn{ background:var(--warn); }
+  .mascot-mini.fire{ background:var(--fire); }
+
   #currentTaskName{ font-size:15px; font-weight:800; margin-bottom:2px; }
   #currentTaskEmpty{ font-size:13px; color:var(--text); font-weight:700; line-height:1.7; padding:6px 0; }
 
@@ -363,7 +373,7 @@
 <!-- ===== 初回だけ出る説明オーバーレイ ===== -->
 <div class="onboarding-overlay" id="onboardingOverlay">
   <div class="onboarding-hero">
-    <div class="mascot safe">😊</div>
+    <div class="mascot safe" id="onboardingMascot"></div>
   </div>
   <div class="onboarding-body">
     <h2>スケジュールを、<br>こわがらずに。</h2>
@@ -381,16 +391,16 @@
 <!-- ===== ① 今まさに作業中の案件(開始ボタンを押した案件)を最上部に大きく表示 ===== -->
 <div class="card" id="currentTaskCard">
   <div id="currentTaskEmpty">
-    <div class="mascot safe">😴</div>
+    <div class="mascot safe" id="emptyMascot"></div>
     作業中の案件はありません。<br>下のリストで「開始」を押してください。
   </div>
   <div id="currentTaskBody" style="display:none;">
-    <div class="mascot safe" id="mascotFace">😐</div>
+    <div class="mascot safe" id="mascotFace"></div>
     <div id="currentTaskName"></div>
     <div class="big-number" id="currentTaskRemaining">--:--</div>
     <div class="big-label">この案件の残り時間</div>
     <div class="gauge-track">
-      <span class="gauge-fire-marker" id="currentTaskFireMarker">🔥</span>
+      <span class="gauge-fire-marker" id="currentTaskFireMarker"></span>
       <div class="gauge-fill safe" id="currentTaskGauge" style="width:100%"></div>
     </div>
   </div>
@@ -537,6 +547,8 @@ const endDayBtn           = document.getElementById('endDayBtn');
 const onboardingOverlay   = document.getElementById('onboardingOverlay');
 const onboardingStartBtn  = document.getElementById('onboardingStartBtn');
 const helpBtn             = document.getElementById('helpBtn');
+const emptyMascot         = document.getElementById('emptyMascot');
+const onboardingMascot    = document.getElementById('onboardingMascot');
 
 // ---- 初回説明オーバーレイ:一度閉じたら二度と自動では出さない ----
 if (localStorage.getItem('scheduleOnboardingSeen') === '1'){
@@ -549,11 +561,64 @@ onboardingStartBtn.addEventListener('click', () => {
 // 「使い方」ボタンでいつでも見返せるようにする
 helpBtn.addEventListener('click', () => { onboardingOverlay.style.display = 'flex'; });
 
-// ステータスに応じた表情の顔文字(セーフ=無表情、注意=困り顔、炎上=泣き顔)
-function faceForStatus(status){
-  if (status === 'fire') return '😭';
-  if (status === 'warn') return '😟';
-  return '😐';
+// 静止画のマスコット(空状態/オンボーディング)は最初に1回だけSVGを流し込む
+emptyMascot.innerHTML = mascotFaceSvg('sleepy', 60);
+onboardingMascot.innerHTML = mascotFaceSvg('safe', 76);
+currentTaskFireMarker.innerHTML = flameSvg(16);
+
+/* =====================================================================
+   ラフ仮素材(SVG):絵文字だと表現の幅が狭く「素材感」が薄いので、
+   マスコットの表情と炎アイコンを線画のSVGに差し替える。
+   あくまで仮素材なので、あとでIllustrator製の本番アセットに差し替えやすいよう
+   「表情ごとに顔のパーツだけを返す関数」というシンプルな形にしている。
+   ===================================================================== */
+const FACE_INK = '#4a3f3f'; // 目・口の線の色(アプリの文字色に合わせた温かい墨色)
+
+const FACE_PATHS = {
+  // セーフ:閉じた三日月目+ゆるい笑み
+  safe: `
+    <path d="M28 44 Q36 34 44 44" fill="none" stroke="${FACE_INK}" stroke-width="6" stroke-linecap="round"/>
+    <path d="M56 44 Q64 34 72 44" fill="none" stroke="${FACE_INK}" stroke-width="6" stroke-linecap="round"/>
+    <path d="M36 64 Q50 76 64 64" fill="none" stroke="${FACE_INK}" stroke-width="6" stroke-linecap="round"/>
+  `,
+  // 注意:ハの字の眉+波打つ口+汗
+  warn: `
+    <line x1="27" y1="39" x2="43" y2="47" stroke="${FACE_INK}" stroke-width="6" stroke-linecap="round"/>
+    <line x1="73" y1="39" x2="57" y2="47" stroke="${FACE_INK}" stroke-width="6" stroke-linecap="round"/>
+    <path d="M36 68 Q43 63 50 68 Q57 73 64 68" fill="none" stroke="${FACE_INK}" stroke-width="6" stroke-linecap="round"/>
+    <path d="M80 26 C85 35 85 42 80 45 C75 42 75 35 80 26 Z" fill="#8fc7ff"/>
+  `,
+  // 炎上:ギュッとつぶった目+泣き口+涙
+  fire: `
+    <path d="M25 37 L40 46 L25 55" fill="none" stroke="${FACE_INK}" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M75 37 L60 46 L75 55" fill="none" stroke="${FACE_INK}" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    <ellipse cx="50" cy="71" rx="13" ry="10" fill="${FACE_INK}"/>
+    <path d="M31 50 C36 59 36 66 31 68 C26 66 26 59 31 50 Z" fill="#5b9bd5"/>
+    <path d="M69 50 C74 59 74 66 69 68 C64 66 64 59 69 50 Z" fill="#5b9bd5"/>
+  `,
+  // 休憩中(まだ何も作業していない時):一文字目+小さい口+Zzz
+  sleepy: `
+    <line x1="28" y1="46" x2="44" y2="46" stroke="${FACE_INK}" stroke-width="6" stroke-linecap="round"/>
+    <line x1="56" y1="46" x2="72" y2="46" stroke="${FACE_INK}" stroke-width="6" stroke-linecap="round"/>
+    <path d="M42 66 Q50 70 58 66" fill="none" stroke="${FACE_INK}" stroke-width="6" stroke-linecap="round"/>
+    <text x="70" y="28" font-size="16" fill="${FACE_INK}" font-family="sans-serif" font-weight="700">z</text>
+  `,
+};
+
+// 表情のSVGをsize(px)の四角い枠で返す。size省略時は72px
+function mascotFaceSvg(status, size){
+  const s = size || 72;
+  const paths = FACE_PATHS[status] || FACE_PATHS.safe;
+  return `<svg viewBox="0 0 100 100" width="${s}" height="${s}" aria-hidden="true">${paths}</svg>`;
+}
+
+// 2トーンの簡易炎アイコン(絵文字🔥の代わり)。sizeはpx指定
+function flameSvg(size){
+  const s = size || 20;
+  return `<svg viewBox="0 0 100 100" width="${s}" height="${s}" aria-hidden="true">
+    <path d="M50 4 C72 30 80 50 69 68 C63 80 50 93 50 93 C50 93 37 80 31 68 C20 50 28 30 50 4 Z" fill="#ff6b6b"/>
+    <path d="M50 30 C61 45 65 55 58 66 C55 73 50 81 50 81 C50 81 45 73 42 66 C35 55 39 45 50 30 Z" fill="#ffc861"/>
+  </svg>`;
 }
 
 startTimeInput.value = startTime;
@@ -690,7 +755,7 @@ function renderCurrentTask(){
   // 「1匹の生き物の機嫌が悪くなっていく」ように見せている
   currentTaskCard.classList.add('hero-' + status);
   mascotFace.className = 'mascot ' + status;
-  mascotFace.textContent = faceForStatus(status);
+  mascotFace.innerHTML = mascotFaceSvg(status, 62);
 }
 
 /* ---------- 5. 案件一覧の描画 ---------- */
@@ -851,7 +916,7 @@ function renderTasks(){
 
     const flameIcon = document.createElement('span');
     flameIcon.className = 'flame-icon';
-    flameIcon.textContent = '🔥';
+    flameIcon.innerHTML = flameSvg(30);
     flameIcon.setAttribute('aria-hidden', 'true');
     card.appendChild(flameIcon);
 
@@ -951,7 +1016,7 @@ function renderTasks(){
         // このバーのどこで炎上が始まるか、最初から炎アイコンで示しておく
         const marker = document.createElement('span');
         marker.className = 'gauge-fire-marker';
-        marker.textContent = '🔥';
+        marker.innerHTML = flameSvg(14);
         marker.style.left = fireLine + '%';
         gaugeTrack.appendChild(marker);
       }
@@ -975,13 +1040,13 @@ function renderTasks(){
       else remainSpan.textContent = `残り ${formatHHMM(task._remainMs)}`;
       const fireBadge = document.createElement('span');
       fireBadge.className = 'fire-badge';
-      fireBadge.textContent = '🔥 炎上中';
+      fireBadge.innerHTML = flameSvg(13) + '<span style="margin-left:4px;">炎上中</span>';
 
       if (task.state !== 'done'){
         const faceSpan = document.createElement('span');
-        faceSpan.style.fontSize = '16px';
+        faceSpan.className = 'mascot-mini ' + status;
         faceSpan.style.marginLeft = '6px';
-        faceSpan.textContent = faceForStatus(status);
+        faceSpan.innerHTML = mascotFaceSvg(status, 16);
         rightMeta.append(remainSpan, faceSpan, fireBadge);
       } else {
         rightMeta.append(remainSpan, fireBadge);
