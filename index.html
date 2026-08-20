@@ -19,7 +19,7 @@
     --card:#ffffff;
     --text:#4a3f3f;
     --sub:#a89a95;
-    --border:#e6cbb2;
+    --border:#d9a97a;
     --safe:#8fd694;
     --safe-bg:#e9f9ea;
     --warn:#ffc861;
@@ -51,7 +51,7 @@
     --card:#1c2748;
     --text:#eef1f8;
     --sub:#8b9bc7;
-    --border:#4a5a94;
+    --border:#8296e6;
     --safe-bg:#173425;
     --warn-bg:#3a2f12;
     --fire-bg:#3a1414;
@@ -78,42 +78,46 @@
     box-shadow:0 4px 14px rgba(180,140,110,0.08);
   }
 
-  /* ---------- ①「今、何をやっているか」を表示する最重要カード ---------- */
-  #currentTaskCard{ text-align:center; border:3px solid transparent; }
-  #currentTaskCard.status-warn{ border-color:var(--warn); background:var(--warn-bg); }
-  #currentTaskCard.status-fire{
-    border-style:dashed;
-    animation:fireshake 1.2s infinite, hazard-flash .6s linear infinite;
-    background:var(--fire-bg);
+  /* ============================================================
+     ヒーローカード(現在作業中):Headspace参考の「単色ブロック+曲線+
+     マスコット」構成。ページ上端・左右の余白から意図的にはみ出させて
+     (フルブリード)、ここだけ他のカードと違う特別な場所だと分からせる。
+     ============================================================ */
+  #currentTaskCard{
+    width:calc(100% + 32px);
+    margin:-22px -16px 16px;
+    padding:34px 24px 28px;
+    border-radius:0 0 42px 42px;
+    text-align:center;
+    background:#ffe3c7; /* 何も作業していない時のデフォルト(あたたかいクリームオレンジ) */
+    transition:background .5s ease;
   }
-  /* 炎上中は枠の色を黄⇔赤で交互に光らせて「工事現場の注意テープ」っぽい緊迫感を出す */
-  @keyframes hazard-flash{
-    0%,100%{ border-color:#ffcf3f; }
-    50%{ border-color:#ff3b3b; }
+  #currentTaskCard.hero-safe{ background:#cdeecd; }
+  #currentTaskCard.hero-warn{ background:#ffe1a8; }
+  #currentTaskCard.hero-fire{ animation:hero-fire-pulse 1.1s ease-in-out infinite, fireshake 1.1s infinite; }
+  @keyframes hero-fire-pulse{
+    0%,100%{ background-color:#ffb4b4; }
+    50%{ background-color:#ff8a8a; }
   }
-  #currentTaskName{ font-size:15px; font-weight:800; margin-bottom:2px; }
-  #currentTaskEmpty{ font-size:13px; color:var(--sub); padding:6px 0; }
 
-  /* 大きな炎アイコン+表情の顔文字。ステータスに応じて大きさ・アニメーションを変える */
-  .fire-face-row{ display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:4px; }
-  .fire-face-row .big-flame{
-    font-size:30px; opacity:.3; filter:grayscale(1);
-    transition:font-size .3s ease, opacity .3s ease, filter .3s ease;
+  /* マスコット:炎/表情バラバラだったのをやめ、1つの丸いキャラクターに統一する。
+     色と表情がステータスに応じて変わることで「ひとつの生き物」として認識できる */
+  .mascot{
+    width:96px; height:96px;
+    border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:46px;
+    margin:0 auto 14px;
+    background:#fff;
+    box-shadow:0 6px 14px rgba(60,40,20,0.15);
+    transition:background .3s ease;
   }
-  .fire-face-row .face-emoji{ font-size:38px; transition:font-size .3s ease; }
-  .fire-face-row.status-warn .big-flame{ font-size:42px; opacity:.75; filter:grayscale(.4); }
-  .fire-face-row.status-fire .big-flame{
-    font-size:66px; opacity:1; filter:none;
-    animation:flame-flicker .5s ease-in-out infinite alternate;
-  }
-  .fire-face-row.status-fire .face-emoji{
-    font-size:52px;
-    animation:face-wobble .35s ease-in-out infinite alternate;
-  }
-  @keyframes face-wobble{
-    0%{ transform:rotate(-7deg); }
-    100%{ transform:rotate(7deg); }
-  }
+  .mascot.safe{ background:#8fd694; }
+  .mascot.warn{ background:#ffc861; }
+  .mascot.fire{ background:#ff6b6b; animation:flame-flicker .5s ease-in-out infinite alternate; }
+
+  #currentTaskName{ font-size:15px; font-weight:800; margin-bottom:2px; }
+  #currentTaskEmpty{ font-size:13px; color:var(--text); font-weight:700; line-height:1.7; padding:6px 0; }
 
   .big-number{
     font-size:50px;
@@ -175,11 +179,12 @@
     width:100%;
     padding:11px 10px;
     border-radius:12px;
-    border:2px solid var(--border);
+    border:2.5px solid var(--border); /* 枠線を太く・明るい色にして、隣の欄とはっきり区別できるようにする */
     background:var(--input-bg);
     color:var(--input-text);
     font-family:inherit;
     font-size:16px;
+    box-shadow:0 2px 4px rgba(0,0,0,0.12); /* うっすら影を付けて「1つの独立したチップ」に見せる */
   }
   input::placeholder{ color:var(--sub); opacity:1; }
   input:focus{ outline:none; border-color:#ffc0a0; }
@@ -206,6 +211,9 @@
   .task-card.status-warn{ border-color:var(--warn-bg); background:var(--warn-bg); }
   .task-card.status-fire{ border-color:#ffb3b3; background:var(--fire-bg); animation:fireshake 1.4s infinite; }
   .task-card.status-done{ opacity:.55; animation:none; }
+  /* 「明日に持ち越し」中の案件は、緊迫感を出さずに落ち着いた見た目にする */
+  .task-card.status-paused{ opacity:.7; animation:none; background:var(--card); }
+  .paused-msg{ font-size:13px; color:var(--sub); font-weight:700; margin-top:8px; }
   @keyframes fireshake{
     0%,100%{ transform:translateX(0); }
     25%{ transform:translateX(-1px) rotate(-0.3deg); }
@@ -313,20 +321,71 @@
   .score-item.safe .score-num{ color:#4caf7a; }
   .score-item.fire .score-num{ color:var(--fire); }
   .score-item.burn .score-num{ color:#8a5a5a; }
+
+  /* ============================================================
+     初回説明(オンボーディング)オーバーレイ。
+     Headspaceの「上半分カラーブロック+下半分白+説明+大きいCTA」を参考に、
+     初めて開いたときだけ全画面で表示する。一度閉じたらlocalStorageに記録。
+     ============================================================ */
+  .onboarding-overlay{
+    position:fixed; inset:0; z-index:999;
+    display:flex; flex-direction:column;
+    background:var(--card);
+  }
+  .onboarding-hero{
+    flex:0 0 40%;
+    background:#ffab7a;
+    border-radius:0 0 46% 46% / 0 0 70px 70px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .onboarding-hero .mascot{ width:120px; height:120px; font-size:58px; margin:0; background:#fff; }
+  .onboarding-body{
+    flex:1;
+    display:flex; flex-direction:column; justify-content:center;
+    padding:30px 26px;
+  }
+  .onboarding-body h2{ font-size:21px; font-weight:800; margin:0 0 18px; line-height:1.5; }
+  .onboarding-list{ list-style:none; padding:0; margin:0 0 30px; }
+  .onboarding-list li{ font-size:14px; font-weight:700; color:var(--text); margin-bottom:14px; line-height:1.6; }
+  #onboardingStartBtn{
+    width:100%; padding:16px; border:none; border-radius:16px;
+    background:#ffab7a; color:#fff; font-family:inherit; font-size:16px; font-weight:800;
+  }
+  #helpBtn{
+    background:none; border:2px solid var(--border); color:var(--sub);
+    font-family:inherit; font-size:11px; font-weight:700;
+    border-radius:999px; padding:4px 12px; margin-left:8px;
+  }
 </style>
 </head>
 <body>
 
-<h1>今日の残りタスク&時間</h1>
+<!-- ===== 初回だけ出る説明オーバーレイ ===== -->
+<div class="onboarding-overlay" id="onboardingOverlay">
+  <div class="onboarding-hero">
+    <div class="mascot safe">😊</div>
+  </div>
+  <div class="onboarding-body">
+    <h2>スケジュールを、<br>こわがらずに。</h2>
+    <ul class="onboarding-list">
+      <li>⏳ 案件ごとの残り時間をゲージで見える化</li>
+      <li>🔥 締切が近づくと「炎上」して教えてくれる</li>
+      <li>🎉 炎上せずにクリアできるかのミニゲーム</li>
+    </ul>
+    <button id="onboardingStartBtn">はじめる</button>
+  </div>
+</div>
+
+<h1>今日の残りタスク&時間 <button id="helpBtn">使い方</button></h1>
 
 <!-- ===== ① 今まさに作業中の案件(開始ボタンを押した案件)を最上部に大きく表示 ===== -->
 <div class="card" id="currentTaskCard">
-  <div id="currentTaskEmpty">作業中の案件はありません。下のリストで「開始」を押してください。</div>
+  <div id="currentTaskEmpty">
+    <div class="mascot safe">😴</div>
+    作業中の案件はありません。<br>下のリストで「開始」を押してください。
+  </div>
   <div id="currentTaskBody" style="display:none;">
-    <div class="fire-face-row" id="fireFaceRow">
-      <span class="big-flame" id="bigFlame">🔥</span>
-      <span class="face-emoji" id="faceEmoji">😐</span>
-    </div>
+    <div class="mascot safe" id="mascotFace">😐</div>
     <div id="currentTaskName"></div>
     <div class="big-number" id="currentTaskRemaining">--:--</div>
     <div class="big-label">この案件の残り時間</div>
@@ -472,10 +531,23 @@ const currentTaskName     = document.getElementById('currentTaskName');
 const currentTaskRemaining= document.getElementById('currentTaskRemaining');
 const currentTaskGauge    = document.getElementById('currentTaskGauge');
 const currentTaskFireMarker = document.getElementById('currentTaskFireMarker');
-const fireFaceRow         = document.getElementById('fireFaceRow');
-const faceEmoji           = document.getElementById('faceEmoji');
+const mascotFace           = document.getElementById('mascotFace');
 const startDayBtn         = document.getElementById('startDayBtn');
 const endDayBtn           = document.getElementById('endDayBtn');
+const onboardingOverlay   = document.getElementById('onboardingOverlay');
+const onboardingStartBtn  = document.getElementById('onboardingStartBtn');
+const helpBtn             = document.getElementById('helpBtn');
+
+// ---- 初回説明オーバーレイ:一度閉じたら二度と自動では出さない ----
+if (localStorage.getItem('scheduleOnboardingSeen') === '1'){
+  onboardingOverlay.style.display = 'none';
+}
+onboardingStartBtn.addEventListener('click', () => {
+  localStorage.setItem('scheduleOnboardingSeen', '1');
+  onboardingOverlay.style.display = 'none';
+});
+// 「使い方」ボタンでいつでも見返せるようにする
+helpBtn.addEventListener('click', () => { onboardingOverlay.style.display = 'flex'; });
 
 // ステータスに応じた表情の顔文字(セーフ=無表情、注意=困り顔、炎上=泣き顔)
 function faceForStatus(status){
@@ -529,6 +601,8 @@ function overallStatusFromPct(pct){ return pct <= 30 ? 'warn' : 'safe'; }
 // 案件1件の「今の状態」(ステータス/残り%/残りミリ秒)を計算する
 function computeTaskStatus(task){
   if (task.state === 'done') return { status:'done', pct:100, remainMs:0 };
+  // 「明日に持ち越し」中(carryOverDateが今日の日付)は、緊迫感を出さず落ち着いた表示にする
+  if (task.carryOverDate === todayStr()) return { status:'paused', pct:100, remainMs:0 };
   const now = new Date();
   const deadlineDate = timeStrToDate(task.deadline);
   const remainMs = deadlineDate - now;
@@ -594,7 +668,7 @@ function updateOverall(){
 /* ---------- 4. 「現在作業中」カードの描画 ---------- */
 function renderCurrentTask(){
   const doing = tasks.find((t) => t.state === 'doing');
-  currentTaskCard.classList.remove('status-warn', 'status-fire');
+  currentTaskCard.classList.remove('hero-safe', 'hero-warn', 'hero-fire');
 
   if (!doing){
     currentTaskEmpty.style.display = 'block';
@@ -610,13 +684,13 @@ function renderCurrentTask(){
   currentTaskGauge.style.width = Math.max(0, pct) + '%';
   currentTaskGauge.className = 'gauge-fill ' + status;
   currentTaskFireMarker.style.left = fireLine + '%'; // 炎上ライン設定が変わっても常に正しい位置に
-  if (status === 'warn' || status === 'fire'){
-    currentTaskCard.classList.add('status-' + status);
-  }
 
-  // 大きな炎+表情:ステータスに応じてクラスを切り替えるとCSS側でサイズ・アニメが変わる
-  fireFaceRow.className = 'fire-face-row status-' + status;
-  faceEmoji.textContent = faceForStatus(status);
+  // ヒーローカードの背景色と、マスコット(丸いキャラクター)の色・表情を
+  // ステータスに応じて同時に切り替える。この2つが必ず連動することで
+  // 「1匹の生き物の機嫌が悪くなっていく」ように見せている
+  currentTaskCard.classList.add('hero-' + status);
+  mascotFace.className = 'mascot ' + status;
+  mascotFace.textContent = faceForStatus(status);
 }
 
 /* ---------- 5. 案件一覧の描画 ---------- */
@@ -646,6 +720,24 @@ function undoTask(id){
   const idx = findTaskIndex(id);
   if (idx === -1) return;
   tasks[idx].state = 'todo';
+  saveTasks();
+  renderAll();
+}
+// 締切を過ぎても終わらなかった案件を、無理に終わらせず「明日に持ち越す」
+// 全焼カウントはすでに加算済みのままにしておく(甘くしすぎるとゲーム性が薄れるため)。
+// 締切の時刻(HH:MM)自体は変えず、日付が変わった瞬間に自動でまた今日の締切として動き出す。
+function carryOverTask(id){
+  const idx = findTaskIndex(id);
+  if (idx === -1) return;
+  tasks[idx].state = 'todo'; // 作業中だった場合はいったん待機に戻す
+  tasks[idx].carryOverDate = todayStr();
+  saveTasks();
+  renderAll();
+}
+function resumeCarriedTask(id){
+  const idx = findTaskIndex(id);
+  if (idx === -1) return;
+  tasks[idx].carryOverDate = null;
   saveTasks();
   renderAll();
 }
@@ -710,29 +802,37 @@ function attachSlideToDelete(handleEl, trackEl, id){
 
 function renderTasks(){
   // ---- 各案件の現在ステータスを先に全部計算しておく ----
+  let carryOverCleared = false;
   tasks.forEach((t) => {
+    // 日付が変わったら「明日に持ち越し」を自動解除し、通常のカウントダウンに戻す
+    if (t.carryOverDate && t.carryOverDate !== todayStr()){
+      t.carryOverDate = null;
+      carryOverCleared = true;
+    }
     const r = computeTaskStatus(t);
     t._currentStatus = r.status;
     t._pct = r.pct;
     t._remainMs = r.remainMs;
-    if (t.state !== 'done' && r.remainMs <= 0 && !t.burnedCounted){
+    // 持ち越し中(paused)は締切超過扱いにしない(すでに全焼カウント済みのため二重計上を防ぐ)
+    if (t.state !== 'done' && t._currentStatus !== 'paused' && r.remainMs <= 0 && !t.burnedCounted){
       t.burnedCounted = true;
       scoreData.burnedOut++;
       saveScore();
       saveTasks();
     }
   });
+  if (carryOverCleared) saveTasks();
 
   // ---- 画面全体の炎上演出(1件でも炎上中があれば赤くパルス) ----
   const anyFire = tasks.some((t) => t.state !== 'done' && t._currentStatus === 'fire');
   document.body.classList.toggle('fire-alert', anyFire);
 
   // ---- 「やばさ順」に並び替えた表示専用のコピーを作る(保存データの順序はいじらない) ----
-  const rank = { fire: 0, warn: 1, safe: 2, done: 3 };
+  const rank = { fire: 0, warn: 1, safe: 2, paused: 3, done: 4 };
   const sorted = [...tasks].sort((a, b) => {
     const diff = rank[a._currentStatus] - rank[b._currentStatus];
     if (diff !== 0) return diff;
-    if (a._currentStatus === 'done') return 0; // 完了同士は元の順番のまま
+    if (a._currentStatus === 'done' || a._currentStatus === 'paused') return 0; // 元の順番のまま
     return a._pct - b._pct; // 残り%が少ない(=ヤバい)ほうを上に
   });
 
@@ -830,6 +930,19 @@ function renderTasks(){
       actions.append(saveBtn, cancelBtn);
       card.appendChild(actions);
 
+    } else if (status === 'paused'){
+      // ---- 明日に持ち越し中:緊迫感を出さず、落ち着いた表示にする ----
+      const msg = document.createElement('div');
+      msg.className = 'paused-msg';
+      msg.textContent = `😴 明日 ${task.deadline} に持ち越し中`;
+      card.appendChild(msg);
+
+      const resumeBtn = document.createElement('button');
+      resumeBtn.className = 'undo-link';
+      resumeBtn.textContent = '今日中に再開する';
+      resumeBtn.addEventListener('click', () => resumeCarriedTask(task.id));
+      card.appendChild(resumeBtn);
+
     } else {
       // ---- 通常モード:ゲージ+締切/残り時間+開始・終了ボタン ----
       const gaugeTrack = document.createElement('div');
@@ -892,6 +1005,15 @@ function renderTasks(){
         endBtn.addEventListener('click', () => endTask(task.id));
         actions.appendChild(endBtn);
         card.appendChild(actions);
+
+        // 締切をすでに過ぎている場合だけ、「今日はもう無理」の逃げ道として持ち越しボタンを出す
+        if (task._remainMs <= 0){
+          const carryBtn = document.createElement('button');
+          carryBtn.className = 'undo-link';
+          carryBtn.textContent = '→ 明日に持ち越す';
+          carryBtn.addEventListener('click', () => carryOverTask(task.id));
+          card.appendChild(carryBtn);
+        }
       } else {
         // ---- 完了済み:見た目でわかる「スライドして削除」ボタン ----
         const track = document.createElement('div');
@@ -939,7 +1061,7 @@ function addTask(){
   if (!text) return;
   const deadline = deadlineInput.value || endTime;
   const estimateMin = Number(estimateInput.value) || 60;
-  tasks.push({ id: genId(), text, deadline, estimateMin, state: 'todo', burnedCounted: false });
+  tasks.push({ id: genId(), text, deadline, estimateMin, state: 'todo', burnedCounted: false, carryOverDate: null });
   saveTasks();
   renderAll();
   taskInput.value = '';
