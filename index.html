@@ -183,14 +183,29 @@
   .gauge-fill.warn{ background:var(--warn); }
   .gauge-fill.fire{ background:var(--fire); }
 
-  /* 就業開始/就業終了ボタン(全体カウント用) */
-  .day-actions{ display:flex; gap:8px; margin-top:14px; }
+  /* 就業開始/休憩/退勤ボタン(全体カウント用) */
+  .day-actions{ display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
   .day-actions button{
-    flex:1; padding:10px; border-radius:12px; border:none;
+    flex:1; min-width:100px; padding:10px; border-radius:12px; border:none;
     font-family:inherit; font-size:13px; font-weight:800;
   }
   .day-actions .btn-start{ background:#fff; border:2px solid #ffab7a !important; color:#e08a55; }
   .day-actions .btn-end{ background:#ffab7a; color:#fff; }
+  /* 休憩ボタン:進行中の暖色系とはっきり区別できるよう、落ち着いた青系にする */
+  .day-actions .btn-break{ background:#fff; border:2px solid #5b9bd5 !important; color:#3f7bb8; }
+  .day-actions .btn-resume{ background:#5b9bd5; color:#fff; }
+
+  /* 休憩中(一時停止中)バッジ:点滅させて「今カウントが止まっている」ことを視覚的に伝える */
+  .onbreak-badge{
+    margin-top:12px; padding:8px 12px; border-radius:12px;
+    background:#eaf2fb; color:#3f7bb8; font-size:12px; font-weight:800;
+    display:flex; align-items:center; gap:6px; justify-content:center;
+    animation:onbreak-pulse 1.6s ease-in-out infinite;
+  }
+  .onbreak-badge .pause-icon{ font-size:14px; }
+  @keyframes onbreak-pulse{
+    0%,100%{ opacity:1; } 50%{ opacity:.55; }
+  }
 
   /* ============================================================
      ポップなCTAボタン共通スタイル(tryclucky.com風)
@@ -209,6 +224,91 @@
     box-shadow:0 0 0 rgba(0,0,0,0.15);
   }
   .day-ended-msg{ font-size:14px; font-weight:800; padding:6px 0; }
+
+  /* ============================================================
+     記録カード(週/月):画像参考の「がんばりが目で見える」を再現。
+     週=円形ゲージ(conic-gradientで進捗を表現)+日別バー、
+     月=カレンダーの日付マスを稼働時間の濃さで塗り分けるヒートマップ。
+     ============================================================ */
+  /* ---- アコーディオンの見出しボタン ----
+     押すたびに .records-body の表示/非表示をJSで切り替える。
+     矢印(▾)はopen時に180度回転させて「開いている」ことを示す */
+  .records-toggle{
+    width:100%; display:flex; align-items:center; justify-content:space-between;
+    background:none; border:none; padding:0; margin:0;
+    font-family:inherit; color:var(--text); cursor:pointer;
+  }
+  .records-toggle-label{ font-size:14px; font-weight:800; }
+  .records-chevron{ font-size:16px; color:var(--sub); transition:transform .25s ease; }
+  .records-toggle[aria-expanded="true"] .records-chevron{ transform:rotate(180deg); }
+  .records-body{ margin-top:16px; }
+
+  .records-tabs{ display:flex; gap:8px; margin-bottom:16px; }
+  .records-tab{
+    flex:1; padding:8px; border-radius:999px; border:2px solid var(--border);
+    background:transparent; color:var(--sub); font-family:inherit; font-size:13px; font-weight:800;
+  }
+  .records-tab.active{ background:#ffab7a; border-color:#ffab7a; color:#fff; }
+
+  .week-ring-wrap{ display:flex; flex-direction:column; align-items:center; margin-bottom:16px; }
+  /* --pct(0〜100)をJSから書き換えるだけで、円グラフの塗り具合が変わる仕組み。
+     0deg地点から時計回りに --pct% ぶんだけ色を塗り、残りは背景色にする */
+  .week-ring{
+    --pct:0;
+    width:140px; height:140px; border-radius:50%;
+    background:conic-gradient(var(--safe) calc(var(--pct)*3.6deg), #f2e9e2 0deg);
+    display:flex; align-items:center; justify-content:center;
+    transition:background .5s ease;
+  }
+  .week-ring-inner{
+    width:112px; height:112px; border-radius:50%; background:var(--card);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+  }
+  .week-ring-num{ font-size:22px; font-weight:800; }
+  .week-ring-label{ font-size:11px; color:var(--sub); font-weight:700; margin-top:2px; }
+  .week-goal-text{ font-size:12px; color:var(--sub); font-weight:700; margin-top:10px; }
+
+  .week-bars{ display:flex; flex-direction:column; gap:8px; }
+  .week-bar-row{ display:flex; align-items:center; gap:10px; }
+  .week-bar-day{ width:28px; font-size:12px; color:var(--sub); font-weight:800; flex-shrink:0; }
+  .week-bar-track{ flex:1; height:14px; background:#f2e9e2; border-radius:999px; overflow:hidden; }
+  .week-bar-fill{ height:100%; border-radius:999px; transition:width .4s ease, background-color .4s ease; }
+  /* 稼働時間の長さで4段階に色分け。月カレンダーのヒートマップ(lv0〜lv3)と
+     まったく同じ色を使うことで、「バーとカレンダーの色は連動している」と一目で伝わるようにする */
+  .week-bar-fill.lv0{ background:#e7ddd3; }
+  .week-bar-fill.lv1{ background:#cdeecd; }
+  .week-bar-fill.lv2{ background:#8fd694; }
+  .week-bar-fill.lv3{ background:#4caf7a; }
+  .week-bar-hours{ width:44px; text-align:right; font-size:12px; font-weight:700; color:var(--text); flex-shrink:0; }
+
+  .month-nav{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+  .month-nav-btn{
+    background:var(--bg); border:none; border-radius:10px; width:32px; height:32px;
+    font-size:13px; color:var(--text); font-weight:800;
+  }
+  .month-nav-label{ font-size:14px; font-weight:800; }
+  .month-weekday-row{
+    display:grid; grid-template-columns:repeat(7,1fr); text-align:center;
+    font-size:11px; color:var(--sub); font-weight:700; margin-bottom:6px;
+  }
+  .month-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
+  .month-cell{
+    aspect-ratio:1; border-radius:9px; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; font-size:10px; font-weight:700;
+    color:var(--text); background:#f2e9e2;
+  }
+  .month-cell.blank{ background:transparent; }
+  .month-cell .cell-day{ font-size:10px; opacity:.65; }
+  .month-cell .cell-face{ font-size:15px; line-height:1; margin-top:2px; }
+  /* 稼働時間の長さに応じて色が濃くなる、4段階のヒートマップ
+     lv0(稼働なし)だけは --bg 変数を使い、夜モードでも背景色が自動追従するようにする
+     (以前は固定の薄ベージュ決め打ちだったため、夜モードで数字が見えにくくなっていた) */
+  .month-cell.lv0{ background:var(--bg); color:var(--sub); }
+  .month-cell.lv1{ background:#cdeecd; color:#2f5f3f; }
+  .month-cell.lv2{ background:#8fd694; color:#fff; }
+  .month-cell.lv3{ background:#4caf7a; color:#fff; }
+  .month-cell.today{ box-shadow:inset 0 0 0 2px #ffab7a; }
+  .month-legend{ font-size:10px; color:var(--sub); text-align:center; margin-top:10px; }
 
   /* ---------- 設定エリア/追加フォーム共通のグリッド ---------- */
   .settings-grid{
@@ -450,14 +550,66 @@
   </div>
 </div>
 
-<!-- ===== ② 就業時間までの全体カウント(こちらは炎上しない仕様のまま) ===== -->
+<!-- ===== ② 就業の稼働時間トラッキング(退勤ボタンを押すまで終わらない) ===== -->
 <div class="card" id="overallCard">
   <div class="big-number" id="remainingTimeNum">--:--:--</div>
-  <div class="big-label">終業までの残り時間</div>
+  <div class="big-label" id="overallLabel">終業までの残り時間</div>
   <div class="gauge-track"><div class="gauge-fill safe" id="overallGauge" style="width:100%"></div></div>
+
+  <!-- 休憩中(一時停止中)であることが一目でわかるバッジ。稼働中は非表示 -->
+  <div class="onbreak-badge" id="onbreakBadge" style="display:none;">
+    <span class="pause-icon">⏸</span> 休憩中(カウントを止めています)
+  </div>
+
   <div class="day-actions">
     <button class="btn-start pop-btn" id="startDayBtn">▶ 就業開始</button>
-    <button class="btn-end pop-btn" id="endDayBtn">■ 就業終了</button>
+    <button class="btn-break pop-btn" id="breakBtn" style="display:none;">⏸ 休憩</button>
+    <button class="btn-resume pop-btn" id="resumeBreakBtn" style="display:none;">▶ 休憩を終える</button>
+    <button class="btn-end pop-btn" id="endDayBtn" style="display:none;">■ 退勤</button>
+  </div>
+</div>
+
+<!-- ===== ②-2 記録(週/月でどれくらい頑張ったか)※アコーディオン ===== -->
+<div class="card" id="recordsCard">
+  <!-- 見出し部分:ここをタップすると中身が開閉する。デフォルトは閉じた状態 -->
+  <button class="records-toggle" id="recordsToggle" aria-expanded="false">
+    <span class="records-toggle-label">📊 記録(週・月でがんばりを見る)</span>
+    <span class="records-chevron" id="recordsChevron">▾</span>
+  </button>
+
+  <div class="records-body" id="recordsBody" style="display:none;">
+    <div class="records-tabs">
+      <button class="records-tab active" id="tabWeekBtn" data-mode="week">週</button>
+      <button class="records-tab" id="tabMonthBtn" data-mode="month">月</button>
+    </div>
+
+    <!-- ---- 週ビュー ---- -->
+    <div id="weekView">
+      <div class="week-ring-wrap">
+        <div class="week-ring" id="weekRing" style="--pct:0;">
+          <div class="week-ring-inner">
+            <div class="week-ring-num" id="weekRingNum">0.0h</div>
+            <div class="week-ring-label">今週の稼働</div>
+          </div>
+        </div>
+        <div class="week-goal-text" id="weekGoalText">目標 0h 中 0h</div>
+      </div>
+      <div class="week-bars" id="weekBars"></div>
+    </div>
+
+    <!-- ---- 月ビュー(カレンダーヒートマップ) ---- -->
+    <div id="monthView" style="display:none;">
+      <div class="month-nav">
+        <button class="month-nav-btn" id="prevMonthBtn">◀</button>
+        <div class="month-nav-label" id="monthNavLabel">2026年8月</div>
+        <button class="month-nav-btn" id="nextMonthBtn">▶</button>
+      </div>
+      <div class="month-weekday-row">
+        <span>日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span>
+      </div>
+      <div class="month-grid" id="monthGrid"></div>
+      <div class="month-legend">背景色=稼働時間(濃いほど長い) / 顔文字=炎上の多さ(😊なし →😅少し→😭多い)</div>
+    </div>
   </div>
 </div>
 
@@ -481,9 +633,10 @@
 <div class="card">
   <div class="settings-grid">
     <div><label>開始時刻</label><input type="time" id="startTimeInput"></div>
-    <div><label>終業時刻</label><input type="time" id="endTimeInput"></div>
+    <div><label>終業時刻(目安)</label><input type="time" id="endTimeInput"></div>
     <div><label>通知間隔(分)</label><input type="number" id="notifyIntervalInput" min="1" value="15"></div>
     <div><label>炎上ライン(残り%)</label><input type="number" id="fireLineInput" min="1" max="90" value="20"></div>
+    <div><label>週の目標稼働時間(h)</label><input type="number" id="weeklyGoalInput" min="1" value="30"></div>
   </div>
 </div>
 
@@ -541,6 +694,7 @@ let startTime      = localStorage.getItem('scheduleStartTime') || '09:00';
 let endTime        = localStorage.getItem('scheduleEndTime') || '18:00';
 let notifyInterval = Number(localStorage.getItem('scheduleNotifyInterval') || 15);
 let fireLine       = Number(localStorage.getItem('scheduleFireLine') || 20);
+let weeklyGoalHours = Number(localStorage.getItem('scheduleWeeklyGoalHours') || 30);
 
 function saveTasks(){ localStorage.setItem('scheduleTasksV3', JSON.stringify(tasks)); }
 function saveSettings(){
@@ -548,9 +702,12 @@ function saveSettings(){
   localStorage.setItem('scheduleEndTime', endTime);
   localStorage.setItem('scheduleNotifyInterval', String(notifyInterval));
   localStorage.setItem('scheduleFireLine', String(fireLine));
+  localStorage.setItem('scheduleWeeklyGoalHours', String(weeklyGoalHours));
 }
 
 function todayStr(){ return new Date().toISOString().slice(0, 10); }
+// "YYYY-MM-DD"文字列からその日のDateオブジェクトを作る(月表示のカレンダー計算用)
+function dateFromStr(str){ const [y,m,d] = str.split('-').map(Number); return new Date(y, m-1, d); }
 
 // ---- 日別の履歴(過去のスコアを日付ごとに積み上げて保存する) ----
 function loadHistory(){ return JSON.parse(localStorage.getItem('scheduleScoreHistory') || '[]'); }
@@ -577,11 +734,64 @@ if (!scoreData || scoreData.date !== todayStr()){
 }
 function saveScore(){ localStorage.setItem('scheduleScore', JSON.stringify(scoreData)); }
 
+// ---- 稼働時間の日別記録(「記録」カードの週リング・月ヒートマップ用データ) ----
+// 1件は { date:"YYYY-MM-DD", workedMs:数値 } だけのシンプルな形。直近365日分を保持する
+// (1年分でも数十KB程度なので許容範囲。週/月ビューどちらも表示できるように長めに残す)
+function loadWorkHistory(){ return JSON.parse(localStorage.getItem('scheduleWorkHistory') || '[]'); }
+function saveWorkHistory(history){
+  const trimmed = history.slice(-365);
+  localStorage.setItem('scheduleWorkHistory', JSON.stringify(trimmed));
+}
+// 指定した日付の記録を作成/更新する(同じ日が複数回保存されないようマージする)
+function upsertWorkHistory(date, workedMs){
+  const history = loadWorkHistory();
+  const idx = history.findIndex((h) => h.date === date);
+  if (idx === -1) history.push({ date, workedMs });
+  else history[idx].workedMs = workedMs;
+  saveWorkHistory(history);
+}
+
+// ---- 就業の状態(1日単位でリセット) ----
+// state: 'not-started'(まだ始まっていない) / 'working'(稼働中) / 'onbreak'(休憩中) / 'ended'(退勤済み)
+// workedMs: これまでに確定した(休憩を除いた)稼働時間の合計
+// segmentStart: 現在「working」を続けている区間の開始時刻(working以外の時はnull)
 let dayData = JSON.parse(localStorage.getItem('scheduleDay') || 'null');
+// ★NaNh バグの修正ポイント:
+// 休憩機能を追加する前のバージョンで保存されたデータには workedMs/segmentStart が
+// そもそも存在しない(undefined)。undefined同士で足し算するとNaNになり、
+// それが週リング・日別バー・月カレンダーすべてに伝染して「NaNh」表示になっていた。
+// → 読み込み直後にここで必ず数値として補正しておく。
+if (dayData){
+  if (typeof dayData.workedMs !== 'number' || Number.isNaN(dayData.workedMs)) dayData.workedMs = 0;
+  if (typeof dayData.segmentStart !== 'number') dayData.segmentStart = null;
+}
 if (!dayData || dayData.date !== todayStr()){
-  dayData = { date: todayStr(), state: 'not-started' };
+  // 日付が変わるタイミングで、前日ぶんの稼働時間を記録(workHistory)に必ず確定させる。
+  // (退勤ボタンを押し忘れて日をまたいだ場合でも、それまでの稼働分は記録として残す)
+  if (dayData){
+    const carriedMs = dayData.workedMs + (dayData.state === 'working' && dayData.segmentStart ? (Date.now() - dayData.segmentStart) : 0);
+    if (carriedMs > 0) upsertWorkHistory(dayData.date, carriedMs);
+  }
+  dayData = { date: todayStr(), state: 'not-started', workedMs: 0, segmentStart: null };
 }
 function saveDay(){ localStorage.setItem('scheduleDay', JSON.stringify(dayData)); }
+
+// 今この瞬間の「本日の稼働時間(ミリ秒)」を返す。workingの間は毎回now基準で伸び続け、
+// onbreak/ended/not-startedの間は確定済みのworkedMsのまま止まって見える。
+function liveWorkedMs(){
+  if (dayData.state === 'working' && dayData.segmentStart){
+    return dayData.workedMs + (Date.now() - dayData.segmentStart);
+  }
+  return dayData.workedMs;
+}
+// 現在進行中の区間(working中の場合のみ)を確定させてworkedMsに合算する。
+// 休憩に入る時・退勤する時・日付が変わる時など、区間を終わらせたい場面で必ず呼ぶ。
+function commitSegment(){
+  if (dayData.state === 'working' && dayData.segmentStart){
+    dayData.workedMs += Date.now() - dayData.segmentStart;
+    dayData.segmentStart = null;
+  }
+}
 
 function renderScore(){
   document.getElementById('scoreSafe').textContent = scoreData.safeClears;
@@ -654,7 +864,26 @@ const currentTaskGauge    = document.getElementById('currentTaskGauge');
 const currentTaskFireMarker = document.getElementById('currentTaskFireMarker');
 const mascotFace           = document.getElementById('mascotFace');
 const startDayBtn         = document.getElementById('startDayBtn');
+const breakBtn            = document.getElementById('breakBtn');
+const resumeBreakBtn      = document.getElementById('resumeBreakBtn');
 const endDayBtn           = document.getElementById('endDayBtn');
+const onbreakBadge        = document.getElementById('onbreakBadge');
+const overallLabel        = document.getElementById('overallLabel');
+const weeklyGoalInput     = document.getElementById('weeklyGoalInput');
+const recordsToggle       = document.getElementById('recordsToggle');
+const recordsBody         = document.getElementById('recordsBody');
+const tabWeekBtn          = document.getElementById('tabWeekBtn');
+const tabMonthBtn         = document.getElementById('tabMonthBtn');
+const weekView            = document.getElementById('weekView');
+const monthView           = document.getElementById('monthView');
+const weekRing            = document.getElementById('weekRing');
+const weekRingNum         = document.getElementById('weekRingNum');
+const weekGoalText        = document.getElementById('weekGoalText');
+const weekBars            = document.getElementById('weekBars');
+const monthNavLabel       = document.getElementById('monthNavLabel');
+const monthGrid           = document.getElementById('monthGrid');
+const prevMonthBtn        = document.getElementById('prevMonthBtn');
+const nextMonthBtn        = document.getElementById('nextMonthBtn');
 const onboardingOverlay   = document.getElementById('onboardingOverlay');
 const onboardingStartBtn  = document.getElementById('onboardingStartBtn');
 const helpBtn             = document.getElementById('helpBtn');
@@ -721,25 +950,56 @@ startTimeInput.value = startTime;
 endTimeInput.value = endTime;
 notifyIntervalInput.value = notifyInterval;
 fireLineInput.value = fireLine;
+weeklyGoalInput.value = weeklyGoalHours;
 deadlineInput.value = endTime;
 
 startTimeInput.addEventListener('change', () => { startTime = startTimeInput.value; saveSettings(); });
 endTimeInput.addEventListener('change', () => { endTime = endTimeInput.value; saveSettings(); });
 notifyIntervalInput.addEventListener('change', () => { notifyInterval = Number(notifyIntervalInput.value) || 15; saveSettings(); });
 fireLineInput.addEventListener('change', () => { fireLine = Number(fireLineInput.value) || 20; saveSettings(); });
+weeklyGoalInput.addEventListener('change', () => { weeklyGoalHours = Number(weeklyGoalInput.value) || 30; saveSettings(); renderRecords(); });
 
 function pad2(n){ return String(n).padStart(2, '0'); }
+
+// ▶ 就業開始:はじめて押した時も、いったん退勤したあとに再開する時も、
+//   ここでは常に「今から働くsegmentを開始する」だけを行う(workedMsは維持=積み上げ)
 startDayBtn.addEventListener('click', () => {
   const now = new Date();
-  startTime = `${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
-  startTimeInput.value = startTime;
-  saveSettings();
+  if (dayData.state === 'not-started'){
+    // その日はじめての開始時だけ、開始時刻表示を「今」に合わせる
+    startTime = `${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
+    startTimeInput.value = startTime;
+    saveSettings();
+  }
   dayData.state = 'working';
+  dayData.segmentStart = Date.now();
   saveDay();
+  renderAll();
 });
+
+// ⏸ 休憩:今の稼働区間をworkedMsに確定させてから止める(=カウントアップが止まる)
+breakBtn.addEventListener('click', () => {
+  commitSegment();
+  dayData.state = 'onbreak';
+  saveDay();
+  renderAll();
+});
+
+// ▶ 休憩を終える:カウントアップを再開する
+resumeBreakBtn.addEventListener('click', () => {
+  dayData.state = 'working';
+  dayData.segmentStart = Date.now();
+  saveDay();
+  renderAll();
+});
+
+// ■ 退勤:ここを押すまでは何時になっても自動終了しない(ユーザーの要望通り)
 endDayBtn.addEventListener('click', () => {
+  commitSegment();
   dayData.state = 'ended';
   saveDay();
+  upsertWorkHistory(dayData.date, dayData.workedMs); // 記録カードにその日の実績として反映
+  renderAll();
 });
 
 /* ---------- 2. 共通ヘルパー ---------- */
@@ -754,7 +1014,6 @@ function statusFromPct(pct){
   if (pct <= 50) return 'warn';
   return 'safe';
 }
-function overallStatusFromPct(pct){ return pct <= 30 ? 'warn' : 'safe'; }
 
 function computeTaskStatus(task){
   if (task.state === 'done') return { status:'done', pct:100, remainMs:0 };
@@ -773,42 +1032,46 @@ function formatHHMM(ms){
   const mm = String(Math.floor((totalSec % 3600) / 60)).padStart(2, '0');
   return `${hh}:${mm}`;
 }
+function formatHours1(ms){
+  // 例: 90分 → "1.5"。渡された値が不正(NaN/undefined等)な時は"0.0"にフォールバックする防御
+  const n = Number(ms);
+  return (Number.isFinite(n) ? n / 3600000 : 0).toFixed(1);
+}
 
-/* ---------- 3. 全体(終業時刻まで)のカウント ---------- */
+/* ---------- 3. 「本日の稼働時間」カードの描画(退勤ボタンを押すまで終わらない) ---------- */
 function updateOverall(){
-  const now = new Date();
-  const end = timeStrToDate(endTime);
-
-  const restartedAfterEnd = startTime >= endTime;
-  if (!restartedAfterEnd && dayData.state !== 'ended' && now >= end){
-    dayData.state = 'ended';
-    saveDay();
-  }
   document.body.classList.toggle('night-mode', dayData.state === 'ended');
-  const isWorking = dayData.state === 'working';
-  startDayBtn.style.display = isWorking ? 'none' : 'block';
-  endDayBtn.style.display = isWorking ? 'block' : 'none';
 
-  if (dayData.state === 'ended'){
-    remainingTimeNum.innerHTML = '<span class="day-ended-msg">お疲れさまでした🌙</span>';
-    overallGauge.style.width = '100%';
-    overallGauge.className = 'gauge-fill safe';
-    return;
-  }
+  // ボタンの出し分け:状態ごとに必要なボタンだけを見せる
+  startDayBtn.style.display    = (dayData.state === 'not-started' || dayData.state === 'ended') ? 'block' : 'none';
+  breakBtn.style.display       = dayData.state === 'working' ? 'block' : 'none';
+  resumeBreakBtn.style.display = dayData.state === 'onbreak' ? 'block' : 'none';
+  endDayBtn.style.display      = (dayData.state === 'working' || dayData.state === 'onbreak') ? 'block' : 'none';
+  onbreakBadge.style.display   = dayData.state === 'onbreak' ? 'flex' : 'none';
 
-  const start = timeStrToDate(startTime);
-  const diffMs = end - now;
-  const totalMs = Math.max(end - start, 1);
-
-  const totalSec = Math.floor(Math.max(diffMs, 0) / 1000);
+  const worked = liveWorkedMs();
+  const totalSec = Math.floor(worked / 1000);
   const hh = String(Math.floor(totalSec / 3600)).padStart(2, '0');
   const mm = String(Math.floor((totalSec % 3600) / 60)).padStart(2, '0');
   const ss = String(totalSec % 60).padStart(2, '0');
   remainingTimeNum.textContent = `${hh}:${mm}:${ss}`;
 
-  const pct = Math.max(0, Math.min(100, (diffMs / totalMs) * 100));
+  const labelText = {
+    'not-started': '本日の稼働時間',
+    'working': '本日の稼働時間(稼働中)',
+    'onbreak': '本日の稼働時間(休憩中)',
+    'ended': '本日の稼働時間(退勤済み)',
+  }[dayData.state];
+  overallLabel.textContent = labelText;
+
+  // ゲージは「開始時刻〜終業時刻(目安)」の長さに対して、実際に働いた時間がどれだけかを示す。
+  // 目安を超えたら残業として黄色になるだけで、そこで止まったりはしない。
+  const start = timeStrToDate(startTime);
+  const end = timeStrToDate(endTime);
+  const targetMs = Math.max(end - start, 1);
+  const pct = Math.max(0, Math.min(100, (worked / targetMs) * 100));
   overallGauge.style.width = pct + '%';
-  overallGauge.className = 'gauge-fill ' + overallStatusFromPct(pct);
+  overallGauge.className = 'gauge-fill ' + (worked > targetMs ? 'warn' : 'safe');
 }
 
 /* ---------- 4. 「現在作業中」カードの描画 ---------- */
@@ -1169,10 +1432,152 @@ function renderTasks(){
   });
 }
 
+/* ---------- 5-2. 記録カード(週/月)の描画 ---------- */
+// 週=直近7日間の「がんばり」を円グラフ+日別バーで見せる
+// 月=カレンダーのマス目を稼働時間の濃さで塗るヒートマップ
+let recordsMode = 'week';       // 'week' | 'month'
+let viewedMonth = new Date();   // 月ビューでどの月を見ているか(prev/nextで移動)
+
+// 指定日(YYYY-MM-DD)の稼働ミリ秒を返す。今日だけは保存前のライブ値を使う
+function getWorkMsForDate(dateStr){
+  if (dateStr === todayStr()) return Number(liveWorkedMs()) || 0;
+  const rec = loadWorkHistory().find((h) => h.date === dateStr);
+  return rec ? (Number(rec.workedMs) || 0) : 0;
+}
+
+// 稼働時間(ミリ秒)を4段階のレベルに変換する。週バーの色・月カレンダーの背景色、
+// 両方がこの関数を共通で使うことで「バーとカレンダーの色は連動している」を実現する。
+// 0h→lv0(なし) / 〜2h→lv1(すこし) / 〜5h→lv2(しっかり) / 5h超→lv3(がっつり)
+function workLevel(ms){
+  const hours = ms / 3600000;
+  if (hours > 5) return 'lv3';
+  if (hours > 2) return 'lv2';
+  if (hours > 0) return 'lv1';
+  return 'lv0';
+}
+
+// 指定日の「炎上した回数」(炎上クリア+全焼の合計)を返す。
+// その日の記録が無ければnull(データなし)を返す
+function getFireCountForDate(dateStr){
+  if (dateStr === todayStr()) return scoreData.fireClears + scoreData.burnedOut;
+  const rec = loadHistory().find((h) => h.date === dateStr);
+  return rec ? (rec.fireClears + rec.burnedOut) : null;
+}
+
+// 炎上回数を顔文字に変換する。0件=にっこり、1〜2件=あせり、3件以上=へとへと。
+// データが無い日(null)は表示しない(空文字)
+function fireCountToEmoji(count){
+  if (count === null) return '';
+  if (count === 0) return '😊';
+  if (count <= 2) return '😅';
+  return '😭';
+}
+
+function switchRecordsTab(mode){
+  recordsMode = mode;
+  tabWeekBtn.classList.toggle('active', mode === 'week');
+  tabMonthBtn.classList.toggle('active', mode === 'month');
+  weekView.style.display = mode === 'week' ? 'block' : 'none';
+  monthView.style.display = mode === 'month' ? 'block' : 'none';
+  renderRecords();
+}
+tabWeekBtn.addEventListener('click', () => switchRecordsTab('week'));
+tabMonthBtn.addEventListener('click', () => switchRecordsTab('month'));
+prevMonthBtn.addEventListener('click', () => { viewedMonth.setMonth(viewedMonth.getMonth() - 1); renderRecords(); });
+nextMonthBtn.addEventListener('click', () => { viewedMonth.setMonth(viewedMonth.getMonth() + 1); renderRecords(); });
+
+// ---- 記録カードのアコーディオン開閉 ----
+// 見たい人だけがタップして開く。開閉状態はlocalStorageに覚えさせておき、
+// 次に開いた時も「開いていた/閉じていた」を引き継ぐ(毎回閉じ直す手間をなくす)
+let recordsOpen = localStorage.getItem('scheduleRecordsOpen') === '1';
+function applyRecordsOpenState(){
+  recordsBody.style.display = recordsOpen ? 'block' : 'none';
+  recordsToggle.setAttribute('aria-expanded', recordsOpen ? 'true' : 'false');
+}
+applyRecordsOpenState();
+recordsToggle.addEventListener('click', () => {
+  recordsOpen = !recordsOpen;
+  localStorage.setItem('scheduleRecordsOpen', recordsOpen ? '1' : '0');
+  applyRecordsOpenState();
+  if (recordsOpen) renderRecords(); // 開いた瞬間に最新の数字で描画し直す
+});
+
+const WEEKDAY_JA = ['日','月','火','水','木','金','土'];
+
+function renderWeekView(){
+  // 直近7日間(6日前〜今日)を古い→新しい順で並べる
+  const days = [];
+  for (let i = 6; i >= 0; i--){
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const dateStr = d.toISOString().slice(0, 10);
+    days.push({ dateStr, weekday: WEEKDAY_JA[d.getDay()], ms: getWorkMsForDate(dateStr) });
+  }
+
+  const totalMs = days.reduce((sum, d) => sum + d.ms, 0);
+  const goalMs = weeklyGoalHours * 3600000;
+  const pct = goalMs > 0 ? Math.min(100, (totalMs / goalMs) * 100) : 0;
+  weekRing.style.setProperty('--pct', pct.toFixed(1));
+  weekRingNum.textContent = formatHours1(totalMs) + 'h';
+  weekGoalText.textContent = `目標 ${weeklyGoalHours}h 中 ${formatHours1(totalMs)}h`;
+
+  // 1本のバーは「8時間で満タン」を基準にする(一般的な1日の稼働時間の目安)
+  const DAY_SCALE_MS = 8 * 3600000;
+  weekBars.innerHTML = '';
+  days.forEach((d) => {
+    const row = document.createElement('div');
+    row.className = 'week-bar-row';
+    const barPct = Math.min(100, (d.ms / DAY_SCALE_MS) * 100);
+    const lv = workLevel(d.ms);
+    row.innerHTML = `
+      <span class="week-bar-day">${d.weekday}</span>
+      <span class="week-bar-track"><span class="week-bar-fill ${lv}" style="width:${barPct}%;"></span></span>
+      <span class="week-bar-hours">${formatHours1(d.ms)}h</span>
+    `;
+    weekBars.appendChild(row);
+  });
+}
+
+function renderMonthView(){
+  const year = viewedMonth.getFullYear();
+  const month = viewedMonth.getMonth(); // 0-11
+  monthNavLabel.textContent = `${year}年${month + 1}月`;
+
+  const firstWeekday = new Date(year, month, 1).getDay(); // その月1日の曜日(0=日)
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  monthGrid.innerHTML = '';
+  // 1日より前の空白マス
+  for (let i = 0; i < firstWeekday; i++){
+    const blank = document.createElement('div');
+    blank.className = 'month-cell blank';
+    monthGrid.appendChild(blank);
+  }
+  for (let day = 1; day <= daysInMonth; day++){
+    const dateStr = `${year}-${pad2(month + 1)}-${pad2(day)}`;
+    const ms = getWorkMsForDate(dateStr);
+    const lv = workLevel(ms);               // 背景色 = 稼働時間の長さ(週バーと連動)
+    const fireCount = getFireCountForDate(dateStr);
+    const face = fireCountToEmoji(fireCount); // 顔文字 = 炎上の多さ
+
+    const cell = document.createElement('div');
+    cell.className = 'month-cell ' + lv + (dateStr === todayStr() ? ' today' : '');
+    cell.title = `${dateStr}: 稼働 ${formatHours1(ms)}h` + (fireCount !== null ? ` / 炎上 ${fireCount}件` : '');
+    cell.innerHTML = `<span class="cell-day">${day}</span><span class="cell-face">${face}</span>`;
+    monthGrid.appendChild(cell);
+  }
+}
+
+function renderRecords(){
+  if (recordsMode === 'week') renderWeekView();
+  else renderMonthView();
+}
+
 function renderAll(){
   renderCurrentTask();
   renderTasks();
   renderScore();
+  renderRecords();
 }
 
 /* ---------- 6. 案件の追加 ---------- */
@@ -1253,6 +1658,7 @@ setInterval(() => {
   }
   renderCurrentTask();
   renderScore();
+  renderRecords();
 
   checkFireTransitions();
   const intervalMs = notifyInterval * 60 * 1000;
